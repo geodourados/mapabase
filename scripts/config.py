@@ -28,6 +28,14 @@ CAMADAS_GEOJSON = {
 
 GEOJSON_DIR = "dados/geojson"
 
+# Campos removidos da publicação pública — dados internos de operação, não
+# informação da própria base cartográfica.
+CAMPOS_OCULTOS = ["usuario_alteracao", "observacao"]
+
+# Filtro aplicado a todas as camadas exportadas — só publica registros
+# validados (situacao = 1).
+FILTRO_WHERE = "situacao = 1"
+
 # Estilo simplestyle-spec (https://github.com/mapbox/simplestyle-spec) aplicado
 # a cada feature exportada — respeitado por GitHub, geojson.io, Leaflet, Mapbox.
 ESTILOS = {

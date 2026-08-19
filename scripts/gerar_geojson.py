@@ -6,10 +6,29 @@ Requer GDAL (ogr2ogr) disponível no PATH.
 """
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 
-from config import CAMADAS_GEOJSON, ESTILOS, GEOJSON_DIR, GPKG_LOCAL_PATH
+from config import (
+    CAMADAS_GEOJSON, CAMPOS_OCULTOS, ESTILOS, FILTRO_WHERE, GEOJSON_DIR, GPKG_LOCAL_PATH,
+)
+
+# Colunas de controle do GPKG que não são atributos da camada — nunca vão no -select.
+COLUNAS_NAO_ATRIBUTO = {"fid", "geom"}
+
+
+def campos_publicaveis(gpkg_path, camada):
+    conn = sqlite3.connect(gpkg_path)
+    conn.text_factory = lambda b: b.decode("utf-8", errors="replace")
+    cur = conn.cursor()
+    cur.execute(f'PRAGMA table_info("{camada}")')
+    colunas = [row[1] for row in cur.fetchall()]
+    conn.close()
+    return [
+        c for c in colunas
+        if c not in COLUNAS_NAO_ATRIBUTO and c not in CAMPOS_OCULTOS
+    ]
 
 
 def exportar_camada(gpkg_path, camada, saida_path):
@@ -17,18 +36,20 @@ def exportar_camada(gpkg_path, camada, saida_path):
     # arquivo já existir — removemos antes em vez de depender da flag.
     if os.path.exists(saida_path):
         os.remove(saida_path)
-    subprocess.run(
-        [
-            "ogr2ogr",
-            "-f", "GeoJSON",
-            "-t_srs", "EPSG:4326",
-            "-lco", "COORDINATE_PRECISION=7",  # ~1cm — suficiente para dados urbanos, reduz tamanho do arquivo
-            saida_path,
-            gpkg_path,
-            camada,
-        ],
-        check=True,
-    )
+
+    campos = campos_publicaveis(gpkg_path, camada)
+    comando = [
+        "ogr2ogr",
+        "-f", "GeoJSON",
+        "-t_srs", "EPSG:4326",
+        "-lco", "COORDINATE_PRECISION=7",  # ~1cm — suficiente para dados urbanos, reduz tamanho do arquivo
+        "-select", ",".join(campos),  # exclui CAMPOS_OCULTOS (dados internos de operação)
+        "-where", FILTRO_WHERE,  # só registros validados
+        saida_path,
+        gpkg_path,
+        camada,
+    ]
+    subprocess.run(comando, check=True)
 
 
 def aplicar_estilo(geojson_path, estilo):
