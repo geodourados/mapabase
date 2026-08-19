@@ -9,6 +9,12 @@ Fonte oficial: Núcleo de Inteligência Geográfica — Departamento de
 Geoprocessamento — Secretaria Municipal de Planejamento — Prefeitura
 Municipal de Dourados-MS.
 
+## Uso rápido no QGIS
+
+Se você usa QGIS (Windows) e só quer abrir o mapa completo, sem se preocupar
+com URLs: baixe e rode **[`Abrir_MapaBase.bat`](Abrir_MapaBase.bat)** — ele
+baixa a versão mais recente e abre o projeto pronto no QGIS automaticamente.
+
 ## O que tem aqui
 
 - **`dados/gpkg/Mapa_GeoDourados.gpkg`** — GeoPackage completo, com todas as

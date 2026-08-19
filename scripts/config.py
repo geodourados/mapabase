@@ -6,7 +6,7 @@ import os
 # fora deste projeto). Configurável por variável de ambiente para funcionar
 # tanto na máquina local quanto em outro servidor sem editar código.
 SOURCE_GPKG_PATH = os.environ.get(
-    "GEODOURADOS_GPKG_PATH", r"C:\GeoDourados-Offline\Mapa_GeoDourados.gpkg"
+    "GEODOURADOS_GPKG_PATH", r"C:\GeoDourados-Fonte\Mapa_GeoDourados.gpkg"
 )
 
 # Cópia de trabalho dentro do repositório, usada para gerar os GeoJSON e para
