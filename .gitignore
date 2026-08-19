@@ -5,3 +5,5 @@ __pycache__/
 # Publicados como assets da Release "latest" — não versionados no git.
 dados/gpkg/
 dados/geojson/lotes_fiscais.geojson
+
+logs/

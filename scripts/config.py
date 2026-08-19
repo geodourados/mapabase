@@ -1,9 +1,19 @@
+import os
+
 # Configuração central da rotina de atualização da base cartográfica pública.
 
-# ID do arquivo no Google Drive (mesmo GPKG distribuído pelo plugin QGIS oficial)
-GDRIVE_FILE_ID = "1UisKbqD-61L1PVno5s2RYGJi7uJD3U0l"
+# Caminho do GPKG de origem (gerado pelo processo interno de geoprocessamento,
+# fora deste projeto). Configurável por variável de ambiente para funcionar
+# tanto na máquina local quanto em outro servidor sem editar código.
+SOURCE_GPKG_PATH = os.environ.get(
+    "GEODOURADOS_GPKG_PATH", r"C:\GeoDourados-Offline\Mapa_GeoDourados.gpkg"
+)
 
+# Cópia de trabalho dentro do repositório, usada para gerar os GeoJSON e para
+# subir como asset da Release "latest". Não é versionada no git (.gitignore).
 GPKG_LOCAL_PATH = "dados/gpkg/Mapa_GeoDourados.gpkg"
+
+REPO = "geodourados/mapabase"
 
 # Camadas do GPKG que devem ser publicadas também como GeoJSON individual.
 # chave = nome da camada dentro do GPKG | valor = nome do arquivo .geojson gerado
