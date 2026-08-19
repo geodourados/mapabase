@@ -45,11 +45,22 @@ def exportar_camada(gpkg_path, camada, saida_path):
         "-lco", "COORDINATE_PRECISION=7",  # ~1cm — suficiente para dados urbanos, reduz tamanho do arquivo
         "-select", ",".join(campos),  # exclui CAMPOS_OCULTOS (dados internos de operação)
         "-where", FILTRO_WHERE,  # só registros validados
+        # -skipfailures: uma geometria inválida isolada (ex: coordenada fora
+        # do domínio de projeção) não pode derrubar a publicação inteira —
+        # pula só a feição com problema e segue.
+        "-skipfailures",
         saida_path,
         gpkg_path,
         camada,
     ]
-    subprocess.run(comando, check=True)
+    resultado = subprocess.run(comando, capture_output=True, text=True)
+    if resultado.returncode != 0:
+        raise subprocess.CalledProcessError(
+            resultado.returncode, comando, resultado.stdout, resultado.stderr
+        )
+    if "ERROR" in resultado.stderr:
+        print(f"  AVISO: alguma(s) feição(ões) de '{camada}' foram puladas — ver detalhe abaixo:")
+        print(resultado.stderr)
 
 
 def aplicar_estilo(geojson_path, estilo):
