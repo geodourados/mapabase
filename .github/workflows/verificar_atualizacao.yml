@@ -1,0 +1,44 @@
+name: Verificar atualização da base
+
+# Roda na nuvem do GitHub, independente da máquina local que publica os
+# dados — se a máquina local quebrar (como aconteceu por 18 dias sem
+# ninguém perceber em set/2026), este workflow continua rodando e avisa.
+#
+# Não faz nada além de checar a data do último asset publicado. Se a base
+# estiver desatualizada há mais de 30h, falha de propósito — o GitHub
+# manda e-mail automático para o dono do repositório quando um workflow
+# agendado falha, sem precisar configurar SMTP.
+
+on:
+  schedule:
+    - cron: "0 13 * * *"  # 13:00 UTC ~= 09:00-10:00 em Campo Grande, com folga após o horário esperado (06:00 local)
+  workflow_dispatch: {}
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checar idade do último GPKG publicado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          UPDATED=$(gh api "repos/${{ github.repository }}/releases/tags/latest" \
+            --jq '.assets[] | select(.name=="Mapa_GeoDourados.gpkg") | .updated_at')
+
+          if [ -z "$UPDATED" ]; then
+            echo "::error::Não encontrei o asset Mapa_GeoDourados.gpkg na Release 'latest'."
+            exit 1
+          fi
+
+          echo "Última atualização: $UPDATED"
+          UPDATED_EPOCH=$(date -d "$UPDATED" +%s)
+          NOW_EPOCH=$(date +%s)
+          HORAS=$(( (NOW_EPOCH - UPDATED_EPOCH) / 3600 ))
+          echo "Idade: ${HORAS}h"
+
+          if [ "$HORAS" -gt 30 ]; then
+            echo "::error::Base cartográfica desatualizada há ${HORAS}h (última publicação: $UPDATED). A tarefa agendada na máquina local provavelmente parou de funcionar — verificar logs em C:\IA_Claude\mapabase-interno\scripts\logs\ e C:\IA_Claude\mapabase\logs\."
+            exit 1
+          fi
+
+          echo "OK — base atualizada nas últimas 30h."
