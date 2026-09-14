@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 from config import GEOJSON_DIR, GPKG_LOCAL_PATH, REPO, SOURCE_GPKG_PATH
 from gerar_geojson import main as gerar_geojson
@@ -29,7 +30,21 @@ def copiar_gpkg_origem():
 
     os.makedirs(os.path.dirname(GPKG_LOCAL_PATH), exist_ok=True)
     log(f"Copiando {SOURCE_GPKG_PATH} -> {GPKG_LOCAL_PATH}")
-    shutil.copyfile(SOURCE_GPKG_PATH, GPKG_LOCAL_PATH)
+
+    # O processo que exporta o GPKG (QGIS headless, etapa anterior da cadeia)
+    # às vezes ainda não liberou totalmente o arquivo no exato instante em
+    # que este script roda logo em seguida — tenta de novo por alguns
+    # segundos em vez de falhar na primeira tentativa.
+    tentativas = 5
+    for i in range(1, tentativas + 1):
+        try:
+            shutil.copyfile(SOURCE_GPKG_PATH, GPKG_LOCAL_PATH)
+            return
+        except PermissionError:
+            if i == tentativas:
+                raise
+            log(f"  arquivo de origem ainda em uso, tentando de novo em 5s ({i}/{tentativas})...")
+            time.sleep(5)
 
 
 def publicar_release():
