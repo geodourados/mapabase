@@ -72,7 +72,30 @@ def commit_push_eixo_viario():
         ["git", "commit", "-m", "Atualização automática do eixo viário"],
         check=True,
     )
-    subprocess.run(["git", "push"], check=True)
+
+    # git push via o Credential Manager do Windows trava indefinidamente em
+    # sessão não-interativa (S4U) — ele tenta abrir um navegador pra OAuth e
+    # não tem pra onde mostrar o prompt. Usa o GH_TOKEN direto via credential
+    # helper inline (nunca escrito em disco) em vez de depender do GCM, e um
+    # timeout como rede de segurança caso trave por outro motivo.
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    try:
+        subprocess.run(
+            [
+                "git",
+                "-c", "credential.helper=",
+                "-c", "credential.helper=!f() { echo username=x-access-token; echo password=$GH_TOKEN; }; f",
+                "push",
+            ],
+            check=True,
+            env=env,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        log("ERRO: git push travou por mais de 120s — abortado. "
+            "Verifique se GH_TOKEN está definido e válido.")
+        sys.exit(1)
 
 
 def main():
