@@ -1,0 +1,16 @@
+[general]
+name=Mapa Base - GeoDourados
+qgisMinimumVersion=3.16
+description=Mapa Digital da Cidade de Dourados - MS. Baixa e mantém atualizada a base cartográfica municipal offline, direto do GitHub público (geodourados/mapabase).
+version=2.0.0
+author=Ênio Alencar da Silva — Geógrafo | Núcleo de Inteligência Geográfica | Departamento de Geoprocessamento | Secretaria Municipal de Planejamento | Prefeitura Municipal de Dourados-MS
+email=enio.silva@dourados.ms.gov.br
+about=Plugin oficial do Mapa Digital de Dourados-MS. Verifica atualizações automaticamente ao abrir o QGIS (ícone na barra de ferramentas mostra um aviso quando há versão nova). Permite salvar um projeto personalizado separado da base oficial, para que atualizações não sobrescrevam customizações do usuário. Base cartográfica instituída pela Lei nº 4.390/2019.
+tracker=https://github.com/geodourados/mapabase/issues
+repository=https://github.com/geodourados/mapabase
+tags=mapa digital,dourados,ms,mato grosso do sul,base cartografica,geopackage,offline,prefeitura,geodourados,geoprocessamento,planejamento
+homepage=https://geoportal.dourados.ms.gov.br/portal/apps/sites/#/home/
+category=Plugins
+icon=icons/icon.png
+experimental=False
+deprecated=False

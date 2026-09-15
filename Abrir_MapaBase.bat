@@ -1,24 +1,50 @@
 @echo off
-REM Baixa a versao mais recente do Mapa Base Digital de Dourados-MS e abre
-REM o projeto QGIS que fica embutido dentro do proprio GeoPackage.
-REM Nao depende do plugin QGIS antigo — so precisa do QGIS instalado.
-REM Se ja existir uma copia local atualizada, pula o download e abre direto.
+REM Instala o plugin "Mapa Base - GeoDourados" no QGIS (se ainda nao
+REM estiver instalado/atualizado), baixa a versao mais recente da base
+REM cartografica e abre o projeto. Depois desta primeira execucao, o
+REM proprio plugin cuida de avisar sobre atualizacoes toda vez que o QGIS
+REM abrir (icone com aviso na barra de ferramentas).
 
 setlocal enabledelayedexpansion
 
 set "DEST_DIR=C:\GeoDourados-Offline"
 set "DEST_GPKG=%DEST_DIR%\Mapa_GeoDourados.gpkg"
-set "URL=https://github.com/geodourados/mapabase/releases/download/latest/Mapa_GeoDourados.gpkg"
+set "URL_GPKG=https://github.com/geodourados/mapabase/releases/download/latest/Mapa_GeoDourados.gpkg"
+set "URL_PLUGIN=https://github.com/geodourados/mapabase/releases/download/latest/MapaBase_GeoDourados_plugin.zip"
 set "NOME_PROJETO=GeoDourados-Offline"
+set "PLUGIN_DIR=%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\MapaBase_GeoDourados"
+set "QGIS3_INI=%APPDATA%\QGIS\QGIS3\profiles\default\QGIS\QGIS3.ini"
 
 if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
+
+echo.
+echo Instalando/atualizando o plugin do Mapa Base no QGIS...
+powershell -NoProfile -Command ^
+    "try {" ^
+    "  $tmpZip = Join-Path $env:TEMP 'MapaBase_GeoDourados_plugin.zip';" ^
+    "  Invoke-WebRequest -Uri '%URL_PLUGIN%' -OutFile $tmpZip -UseBasicParsing;" ^
+    "  $destino = '%PLUGIN_DIR%';" ^
+    "  if (Test-Path $destino) { Remove-Item $destino -Recurse -Force };" ^
+    "  Expand-Archive -Path $tmpZip -DestinationPath (Split-Path $destino -Parent) -Force;" ^
+    "  Remove-Item $tmpZip -Force;" ^
+    "  $iniPath = '%QGIS3_INI%';" ^
+    "  New-Item -ItemType Directory -Force -Path (Split-Path $iniPath -Parent) | Out-Null;" ^
+    "  if (Test-Path $iniPath) { $c = Get-Content $iniPath -Raw -Encoding UTF8 } else { $c = '' };" ^
+    "  if ($c -notmatch '\[PythonPlugins\]') { $c += \"`r`n[PythonPlugins]`r`n\" };" ^
+    "  if ($c -match 'MapaBase_GeoDourados\s*=.*') { $c = $c -replace 'MapaBase_GeoDourados\s*=.*', 'MapaBase_GeoDourados=true' }" ^
+    "  else { $c = $c -replace '(\[PythonPlugins\]\r?\n)', \"`$1MapaBase_GeoDourados=true`r`n\" };" ^
+    "  Set-Content -Path $iniPath -Value $c -Encoding UTF8 -NoNewline;" ^
+    "} catch { Write-Output ('ERRO: ' + $_.Exception.Message); exit 1 }"
+if errorlevel 1 (
+    echo AVISO: falha ao instalar o plugin — a base ainda sera baixada, mas sem o aviso automatico de atualizacao.
+)
 
 set "PRECISA_BAIXAR=1"
 if exist "%DEST_GPKG%" (
     echo Verificando se ha atualizacao disponivel...
     set "STATUS="
     for /f "usebackq delims=" %%S in (`powershell -NoProfile -Command ^
-        "$ErrorActionPreference='Stop'; $l=(Get-Item '%DEST_GPKG%').Length; try { $r=(Invoke-WebRequest -Uri '%URL%' -Method Head -UseBasicParsing).Headers['Content-Length']; $r=[int64]$r[0] } catch { Write-Output 'erro'; exit }; if ([Math]::Abs($r-$l) -le 1024) { Write-Output 'atualizado' } else { Write-Output 'desatualizado' }"`) do set "STATUS=%%S"
+        "$ErrorActionPreference='Stop'; $l=(Get-Item '%DEST_GPKG%').Length; try { $r=(Invoke-WebRequest -Uri '%URL_GPKG%' -Method Head -UseBasicParsing).Headers['Content-Length']; $r=[int64]$r[0] } catch { Write-Output 'erro'; exit }; if ([Math]::Abs($r-$l) -le 1024) { Write-Output 'atualizado' } else { Write-Output 'desatualizado' }"`) do set "STATUS=%%S"
 
     if "!STATUS!"=="atualizado" (
         echo Ja esta na versao mais recente — pulando download.
@@ -33,10 +59,10 @@ if exist "%DEST_GPKG%" (
 if "!PRECISA_BAIXAR!"=="1" (
     echo.
     echo Baixando base cartografica mais recente...
-    echo   %URL%
+    echo   %URL_GPKG%
     echo   -^> %DEST_GPKG%
     echo.
-    powershell -NoProfile -Command "try { Invoke-WebRequest -Uri '%URL%' -OutFile '%DEST_GPKG%.tmp' -UseBasicParsing } catch { exit 1 }"
+    powershell -NoProfile -Command "try { Invoke-WebRequest -Uri '%URL_GPKG%' -OutFile '%DEST_GPKG%.tmp' -UseBasicParsing } catch { exit 1 }"
     if errorlevel 1 (
         echo.
         echo ERRO: falha no download. Verifique sua conexao com a internet.
@@ -44,6 +70,14 @@ if "!PRECISA_BAIXAR!"=="1" (
         exit /b 1
     )
     move /y "%DEST_GPKG%.tmp" "%DEST_GPKG%" >nul
+    if errorlevel 1 (
+        echo.
+        echo ERRO: nao foi possivel substituir o arquivo atual.
+        echo Feche todas as janelas do QGIS que estejam com o Mapa Base aberto e tente de novo.
+        del "%DEST_GPKG%.tmp" >nul 2>nul
+        pause
+        exit /b 1
+    )
 )
 
 echo Procurando instalacao do QGIS...

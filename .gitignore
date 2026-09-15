@@ -7,3 +7,7 @@ dados/gpkg/
 dados/geojson/lotes_fiscais.geojson
 
 logs/
+
+# Build gerado a partir de plugin/MapaBase_GeoDourados/ — publicado como
+# asset da Release "latest", não versionado no git.
+plugin/MapaBase_GeoDourados_plugin.zip
