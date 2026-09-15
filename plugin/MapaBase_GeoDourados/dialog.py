@@ -31,7 +31,7 @@ class MapaBaseDialog(QDialog):
         self._on_fechar = on_fechar
         self.setWindowTitle("Mapa Base - GeoDourados")
         self.setWindowIcon(QIcon(os.path.join(PLUGIN_DIR, "icons", "icon.png")))
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(340)
         self.setModal(False)
         self._build_ui()
         self.atualizar_status()
@@ -46,24 +46,24 @@ class MapaBaseDialog(QDialog):
 
         header = QFrame()
         header.setStyleSheet("background-color: #1a365d;")
-        header.setFixedHeight(60)
+        header.setFixedHeight(44)
         hl = QHBoxLayout(header)
-        hl.setContentsMargins(12, 6, 12, 6)
+        hl.setContentsMargins(10, 4, 10, 4)
         brasao_path = os.path.join(PLUGIN_DIR, "icons", "brasao.png")
         if os.path.exists(brasao_path):
             lbl = QLabel()
-            lbl.setPixmap(QPixmap(brasao_path).scaled(44, 44, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            lbl.setPixmap(QPixmap(brasao_path).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             hl.addWidget(lbl)
         tl = QLabel("Mapa Base Digital da Cidade de Dourados - MS")
-        tl.setStyleSheet("color:white;font-size:11px;font-weight:bold;")
-        tl.setWordWrap(True)
+        tl.setStyleSheet("color:white;font-size:9px;font-weight:bold;")
+        tl.setWordWrap(False)
         hl.addWidget(tl)
         hl.addStretch()
         main.addWidget(header)
 
         corpo = QVBoxLayout()
-        corpo.setContentsMargins(12, 12, 12, 12)
-        corpo.setSpacing(8)
+        corpo.setContentsMargins(8, 8, 8, 8)
+        corpo.setSpacing(5)
 
         # Status
         self.frm_status = QFrame()
@@ -84,7 +84,7 @@ class MapaBaseDialog(QDialog):
         corpo.addWidget(self.lbl_prog)
 
         self.btn_atualizar = QPushButton("⬇  Baixar / Atualizar base")
-        self.btn_atualizar.setFixedHeight(32)
+        self.btn_atualizar.setFixedHeight(27)
         self.btn_atualizar.setStyleSheet(
             "QPushButton{background:#1a365d;color:white;border-radius:4px;font-weight:bold;}"
             "QPushButton:hover{background:#2c5f8a;}QPushButton:disabled{background:#aaa;}"
@@ -93,7 +93,7 @@ class MapaBaseDialog(QDialog):
         corpo.addWidget(self.btn_atualizar)
 
         self.btn_abrir_oficial = QPushButton("📂  Abrir projeto oficial")
-        self.btn_abrir_oficial.setFixedHeight(30)
+        self.btn_abrir_oficial.setFixedHeight(25)
         self.btn_abrir_oficial.clicked.connect(self._on_abrir_oficial)
         corpo.addWidget(self.btn_abrir_oficial)
 
@@ -116,12 +116,12 @@ class MapaBaseDialog(QDialog):
 
         linha_botoes = QHBoxLayout()
         self.btn_salvar_pers = QPushButton("💾  Salvar projeto atual")
-        self.btn_salvar_pers.setFixedHeight(30)
+        self.btn_salvar_pers.setFixedHeight(25)
         self.btn_salvar_pers.clicked.connect(self._on_salvar_personalizado)
         linha_botoes.addWidget(self.btn_salvar_pers)
 
         self.btn_abrir_pers = QPushButton("📂  Abrir meu projeto")
-        self.btn_abrir_pers.setFixedHeight(30)
+        self.btn_abrir_pers.setFixedHeight(25)
         self.btn_abrir_pers.clicked.connect(self._on_abrir_personalizado)
         linha_botoes.addWidget(self.btn_abrir_pers)
         corpo.addLayout(linha_botoes)
@@ -130,9 +130,8 @@ class MapaBaseDialog(QDialog):
         self.lbl_pers_status.setStyleSheet("font-size:9px;color:#888;")
         corpo.addWidget(self.lbl_pers_status)
 
-        corpo.addStretch()
-
         btn_fechar = QPushButton("Fechar")
+        btn_fechar.setFixedHeight(24)
         btn_fechar.clicked.connect(self.close)
         corpo.addWidget(btn_fechar)
 

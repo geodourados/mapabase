@@ -35,23 +35,19 @@ class MapaBaseGeoDouradosPlugin:
 
         self.iface.addPluginToMenu("Mapa Base - GeoDourados", self.action)
 
-        db_toolbar = self.iface.mainWindow().findChild(QToolBar, "mDatabaseToolBar")
-        if db_toolbar:
-            db_toolbar.addAction(self.action)
-        else:
-            self._toolbar = self.iface.addToolBar("Mapa Base - GeoDourados")
-            self._toolbar.setObjectName("MapaBaseGeoDouradosToolbar")
-            self._toolbar.setIconSize(QSize(24, 24))
-            self._toolbar.addAction(self.action)
+        # Barra de ferramentas própria e separada (não mesclada em nenhuma
+        # barra existente), para poder ser arrastada/reposicionada livremente
+        # — mesmo padrão usado no plugin GeoDourados - Cadastro Fiscal.
+        self._toolbar = self.iface.addToolBar("Mapa Base - GeoDourados")
+        self._toolbar.setObjectName("MapaBaseGeoDouradosToolbar")
+        self._toolbar.setIconSize(QSize(24, 24))
+        self._toolbar.addAction(self.action)
 
         # Checa atualização em segundo plano, sem travar a abertura do QGIS.
         self._checar_atualizacao_em_segundo_plano()
 
     def unload(self):
         self.iface.removePluginMenu("Mapa Base - GeoDourados", self.action)
-        db_toolbar = self.iface.mainWindow().findChild(QToolBar, "mDatabaseToolBar")
-        if db_toolbar:
-            db_toolbar.removeAction(self.action)
         if hasattr(self, "_toolbar") and self._toolbar:
             self._toolbar.deleteLater()
             self._toolbar = None
