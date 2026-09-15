@@ -17,12 +17,17 @@ REPO = "geodourados/mapabase"
 
 # Camadas do GPKG que devem ser publicadas também como GeoJSON individual.
 # chave = nome da camada dentro do GPKG | valor = nome do arquivo .geojson gerado
-# Confirmado em 2026-08-19 direto no GPKG local (C:\GeoDourados-Offline):
-#   - "3_lotes": schema de cadastro fiscal (insc_imob, matricula, zoneamento) — 120.327 registros
-#   - "4_logradouros  atual_e_anterior": corresponde a mapa_cadastral.eixo_viario no banco
-#     (7.518 registros) — fonte oficial confirmada pelo usuário
+#
+# Desde 2026-09-15, o nome exportado pro GPKG é o nome ESTÁVEL da tabela do
+# PostgreSQL (ver NOME_EXPORTACAO_POR_ID em mapabase-interno/scripts/
+# exportar_gpkg.py) — não muda mais se a camada for renomeada no QGIS.
+#   - "lotes_fiscais": schema de cadastro fiscal (insc_imob, matricula, zoneamento)
+#   - "4_logradouros  atual_e_anterior": corresponde a mapa_cadastral.eixo_viario no
+#     banco (fonte oficial confirmada pelo usuário) — nome de override manual, não
+#     é o nome puro da tabela, porque duas camadas do projeto apontam pra essa
+#     mesma tabela com filtros SQL diferentes.
 CAMADAS_GEOJSON = {
-    "3_lotes": "lotes_fiscais",
+    "lotes_fiscais": "lotes_fiscais",
     "4_logradouros  atual_e_anterior": "eixo_viario",
 }
 
