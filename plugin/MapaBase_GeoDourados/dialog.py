@@ -4,8 +4,8 @@ from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar,
     QMessageBox, QFrame, QListWidget, QInputDialog, QLineEdit,
 )
-from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
-from qgis.PyQt.QtGui import QIcon, QPixmap
+from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal, QUrl
+from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices
 
 PLUGIN_DIR = os.path.dirname(__file__)
 
@@ -43,6 +43,12 @@ class MapaBaseDialog(QDialog):
 
     def _build_ui(self):
         main = QVBoxLayout(self)
+        main.setContentsMargins(0, 0, 0, 0)
+        main.setSpacing(0)
+
+        corpo = QVBoxLayout()
+        corpo.setContentsMargins(8, 8, 8, 8)
+        corpo.setSpacing(5)
 
         header = QFrame()
         header.setStyleSheet("background-color: #1a365d;")
@@ -59,11 +65,7 @@ class MapaBaseDialog(QDialog):
         tl.setWordWrap(False)
         hl.addWidget(tl)
         hl.addStretch()
-        main.addWidget(header)
-
-        corpo = QVBoxLayout()
-        corpo.setContentsMargins(8, 8, 8, 8)
-        corpo.setSpacing(5)
+        corpo.addWidget(header)
 
         # Status
         self.frm_status = QFrame()
@@ -96,6 +98,31 @@ class MapaBaseDialog(QDialog):
         self.btn_abrir_oficial.setFixedHeight(25)
         self.btn_abrir_oficial.clicked.connect(self._on_abrir_oficial)
         corpo.addWidget(self.btn_abrir_oficial)
+
+        # Croqui (PDF)
+        linha_croqui = QFrame()
+        linha_croqui.setFrameShape(QFrame.HLine)
+        corpo.addWidget(linha_croqui)
+
+        lbl_croqui = QLabel("Croqui de localização (PDF)")
+        lbl_croqui.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
+        corpo.addWidget(lbl_croqui)
+
+        lbl_croqui_info = QLabel("Selecione 1 lote no mapa do projeto oficial e clique:")
+        lbl_croqui_info.setStyleSheet("font-size:9px;color:#666;")
+        corpo.addWidget(lbl_croqui_info)
+
+        linha_croqui_botoes = QHBoxLayout()
+        self.btn_croqui_1000 = QPushButton("🗺  Croqui 1:1000")
+        self.btn_croqui_1000.setFixedHeight(25)
+        self.btn_croqui_1000.clicked.connect(lambda: self._on_gerar_croqui(1000))
+        linha_croqui_botoes.addWidget(self.btn_croqui_1000)
+
+        self.btn_croqui_tela = QPushButton("🗺  Croqui (escala da tela)")
+        self.btn_croqui_tela.setFixedHeight(25)
+        self.btn_croqui_tela.clicked.connect(lambda: self._on_gerar_croqui(None))
+        linha_croqui_botoes.addWidget(self.btn_croqui_tela)
+        corpo.addLayout(linha_croqui_botoes)
 
         # Projeto personalizado
         linha = QFrame()
@@ -135,6 +162,32 @@ class MapaBaseDialog(QDialog):
         self.btn_excluir_pers.setFixedHeight(22)
         self.btn_excluir_pers.clicked.connect(self._on_excluir_personalizado)
         corpo.addWidget(self.btn_excluir_pers)
+
+        # Links úteis
+        linha_links = QFrame()
+        linha_links.setFrameShape(QFrame.HLine)
+        corpo.addWidget(linha_links)
+
+        lbl_links = QLabel("Links úteis")
+        lbl_links.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
+        corpo.addWidget(lbl_links)
+
+        LINKS = [
+            ("📄  CND (Certidão Negativa)", "https://cac.dourados.ms.gov.br/emissoes/documentos/certidao-negativa/imovel"),
+            ("💰  Valor Venal", "https://cac.dourados.ms.gov.br/emissoes/documentos/certidao-venal"),
+            ("🏗  Aprova Digital", "https://dourados.aprova.com.br/home"),
+            ("📋  Protocolo BETHA", "https://protocolo.betha.cloud/#/cidadao/dashboard"),
+        ]
+        linha_links1 = QHBoxLayout()
+        linha_links2 = QHBoxLayout()
+        for i, (texto, url) in enumerate(LINKS):
+            btn = QPushButton(texto)
+            btn.setFixedHeight(24)
+            btn.setStyleSheet("font-size:9px;")
+            btn.clicked.connect(lambda _checked, u=url: QDesktopServices.openUrl(QUrl(u)))
+            (linha_links1 if i < 2 else linha_links2).addWidget(btn)
+        corpo.addLayout(linha_links1)
+        corpo.addLayout(linha_links2)
 
         btn_fechar = QPushButton("Fechar")
         btn_fechar.setFixedHeight(24)
@@ -217,6 +270,22 @@ class MapaBaseDialog(QDialog):
         uri = f"geopackage:{paths['gpkg']}?projectName={PROJETO_NOME}"
         self.iface.addProject(uri)
         self.close()
+
+    # ── Croqui ───────────────────────────────────────────────────────────
+    def _on_gerar_croqui(self, escala_fixa):
+        from .sync import get_local_paths
+        from . import croqui
+
+        paths = get_local_paths()
+        if not os.path.exists(paths["gpkg"]):
+            QMessageBox.warning(self, "Não instalado", "Baixe o Mapa Base primeiro.")
+            return
+
+        ok, msg = croqui.gerar_croqui(self.iface, paths["gpkg"], escala_fixa=escala_fixa)
+        if ok:
+            QMessageBox.information(self, "Croqui gerado", msg)
+        else:
+            QMessageBox.warning(self, "Não foi possível gerar o croqui", msg)
 
     # ── Projeto personalizado ────────────────────────────────────────────
     def _on_salvar_personalizado(self):
