@@ -5,12 +5,13 @@ baixava do Google Drive — a distribuição oficial agora é via GitHub.
 """
 import glob
 import os
+import re
 import urllib.error
 import urllib.request
 
 GPKG_FILENAME = "Mapa_GeoDourados.gpkg"
 PROJETO_NOME = "GeoDourados-Offline"
-PROJETO_PERSONALIZADO_FILENAME = "MeuProjeto.qgz"
+PASTA_MEUS_PROJETOS = "MeusProjetos"
 DEFAULT_DIR = r"C:\GeoDourados-Offline"
 
 URL_GPKG = "https://github.com/geodourados/mapabase/releases/download/latest/Mapa_GeoDourados.gpkg"
@@ -23,8 +24,31 @@ def get_local_paths(install_dir=None):
     return {
         "dir": d,
         "gpkg": os.path.join(d, GPKG_FILENAME),
-        "projeto_personalizado": os.path.join(d, PROJETO_PERSONALIZADO_FILENAME),
+        "meus_projetos_dir": os.path.join(d, PASTA_MEUS_PROJETOS),
     }
+
+
+def slug_nome_projeto(nome):
+    """Nome digitado pelo usuário -> nome de arquivo seguro."""
+    nome = nome.strip()
+    nome = re.sub(r'[\\/:*?"<>|]', "", nome)  # caracteres inválidos em nome de arquivo no Windows
+    return nome[:80]  # limite razoável
+
+
+def listar_meus_projetos(install_dir=None):
+    """Nomes (sem extensão) dos projetos personalizados salvos, mais recente primeiro."""
+    paths = get_local_paths(install_dir)
+    pasta = paths["meus_projetos_dir"]
+    if not os.path.exists(pasta):
+        return []
+    arquivos = [f for f in os.listdir(pasta) if f.lower().endswith(".qgz")]
+    arquivos.sort(key=lambda f: os.path.getmtime(os.path.join(pasta, f)), reverse=True)
+    return [os.path.splitext(f)[0] for f in arquivos]
+
+
+def caminho_meu_projeto(nome, install_dir=None):
+    paths = get_local_paths(install_dir)
+    return os.path.join(paths["meus_projetos_dir"], f"{slug_nome_projeto(nome)}.qgz")
 
 
 def obter_tamanho_remoto():

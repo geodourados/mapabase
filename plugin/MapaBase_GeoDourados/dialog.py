@@ -2,7 +2,7 @@ import os
 
 from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar,
-    QMessageBox, QFrame, QFileDialog,
+    QMessageBox, QFrame, QListWidget, QInputDialog, QLineEdit,
 )
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
 from qgis.PyQt.QtGui import QIcon, QPixmap
@@ -102,33 +102,39 @@ class MapaBaseDialog(QDialog):
         linha.setFrameShape(QFrame.HLine)
         corpo.addWidget(linha)
 
-        lbl_pers = QLabel("Meu projeto personalizado")
+        lbl_pers = QLabel("Meus projetos personalizados")
         lbl_pers.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
         corpo.addWidget(lbl_pers)
 
         lbl_pers_info = QLabel(
-            "Adicionou camadas ou mudou estilos? Salve seu projeto aqui — ele fica "
-            "separado da base oficial, então atualizar a base não sobrescreve suas mudanças."
+            "Adicionou camadas ou mudou estilos? Salve com um nome — fica separado "
+            "da base oficial, então atualizar a base não sobrescreve suas mudanças. "
+            "Pode salvar quantos quiser."
         )
         lbl_pers_info.setWordWrap(True)
         lbl_pers_info.setStyleSheet("font-size:9px;color:#666;")
         corpo.addWidget(lbl_pers_info)
 
+        self.lista_pers = QListWidget()
+        self.lista_pers.setFixedHeight(80)
+        corpo.addWidget(self.lista_pers)
+
         linha_botoes = QHBoxLayout()
-        self.btn_salvar_pers = QPushButton("💾  Salvar projeto atual")
+        self.btn_salvar_pers = QPushButton("💾  Salvar como novo")
         self.btn_salvar_pers.setFixedHeight(25)
         self.btn_salvar_pers.clicked.connect(self._on_salvar_personalizado)
         linha_botoes.addWidget(self.btn_salvar_pers)
 
-        self.btn_abrir_pers = QPushButton("📂  Abrir meu projeto")
+        self.btn_abrir_pers = QPushButton("📂  Abrir selecionado")
         self.btn_abrir_pers.setFixedHeight(25)
         self.btn_abrir_pers.clicked.connect(self._on_abrir_personalizado)
         linha_botoes.addWidget(self.btn_abrir_pers)
         corpo.addLayout(linha_botoes)
 
-        self.lbl_pers_status = QLabel("")
-        self.lbl_pers_status.setStyleSheet("font-size:9px;color:#888;")
-        corpo.addWidget(self.lbl_pers_status)
+        self.btn_excluir_pers = QPushButton("🗑  Excluir selecionado")
+        self.btn_excluir_pers.setFixedHeight(22)
+        self.btn_excluir_pers.clicked.connect(self._on_excluir_personalizado)
+        corpo.addWidget(self.btn_excluir_pers)
 
         btn_fechar = QPushButton("Fechar")
         btn_fechar.setFixedHeight(24)
@@ -159,15 +165,18 @@ class MapaBaseDialog(QDialog):
                 self.btn_atualizar.setText("🔄  Verificar / Atualizar")
             self.btn_abrir_oficial.setEnabled(True)
 
-        pers_existe = os.path.exists(paths["projeto_personalizado"])
-        self.btn_abrir_pers.setEnabled(pers_existe)
-        if pers_existe:
-            import datetime
-            mtime = os.path.getmtime(paths["projeto_personalizado"])
-            data = datetime.datetime.fromtimestamp(mtime).strftime("%d/%m/%Y %H:%M")
-            self.lbl_pers_status.setText(f"Último salvo em {data}")
-        else:
-            self.lbl_pers_status.setText("Nenhum projeto personalizado salvo ainda.")
+        self._atualizar_lista_personalizados()
+
+    def _atualizar_lista_personalizados(self):
+        from .sync import listar_meus_projetos
+        self.lista_pers.clear()
+        nomes = listar_meus_projetos()
+        self.lista_pers.addItems(nomes)
+        tem_algum = len(nomes) > 0
+        self.btn_abrir_pers.setEnabled(tem_algum)
+        self.btn_excluir_pers.setEnabled(tem_algum)
+        if tem_algum:
+            self.lista_pers.setCurrentRow(0)
 
     def _set_status(self, texto, bg, borda):
         self.lbl_status.setText(texto)
@@ -212,31 +221,65 @@ class MapaBaseDialog(QDialog):
     # ── Projeto personalizado ────────────────────────────────────────────
     def _on_salvar_personalizado(self):
         from qgis.core import QgsProject
-        from .sync import get_local_paths
-        paths = get_local_paths()
-        os.makedirs(paths["dir"], exist_ok=True)
+        from .sync import get_local_paths, caminho_meu_projeto, slug_nome_projeto
 
-        resp = QMessageBox.question(
-            self, "Salvar projeto personalizado",
-            "Isso salva o projeto ABERTO ATUALMENTE no QGIS como seu projeto "
-            "personalizado (separado da base oficial). Continuar?",
-            QMessageBox.Yes | QMessageBox.No,
+        nome, ok_clicou = QInputDialog.getText(
+            self, "Salvar projeto como",
+            "Nome pra esse projeto (ex: \"Zona Norte\", \"Fiscalização 2026\"):",
+            QLineEdit.Normal, "",
         )
-        if resp != QMessageBox.Yes:
+        if not ok_clicou or not slug_nome_projeto(nome):
             return
 
-        ok = QgsProject.instance().write(paths["projeto_personalizado"])
+        destino = caminho_meu_projeto(nome)
+        if os.path.exists(destino):
+            resp = QMessageBox.question(
+                self, "Já existe",
+                f'Já existe um projeto salvo com o nome "{nome}". Substituir?',
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if resp != QMessageBox.Yes:
+                return
+
+        paths = get_local_paths()
+        os.makedirs(paths["meus_projetos_dir"], exist_ok=True)
+
+        ok = QgsProject.instance().write(destino)
         if ok:
-            QMessageBox.information(self, "Salvo", "Projeto personalizado salvo com sucesso.")
+            QMessageBox.information(self, "Salvo", f'Projeto "{nome}" salvo com sucesso.')
             self.atualizar_status()
         else:
             QMessageBox.critical(self, "Erro", "Não foi possível salvar o projeto.")
 
+    def _item_selecionado(self):
+        item = self.lista_pers.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Nada selecionado", "Selecione um projeto na lista primeiro.")
+            return None
+        return item.text()
+
     def _on_abrir_personalizado(self):
-        from .sync import get_local_paths
-        paths = get_local_paths()
-        if not os.path.exists(paths["projeto_personalizado"]):
-            QMessageBox.warning(self, "Não encontrado", "Você ainda não salvou um projeto personalizado.")
+        from .sync import caminho_meu_projeto
+        nome = self._item_selecionado()
+        if not nome:
             return
-        self.iface.addProject(paths["projeto_personalizado"])
+        self.iface.addProject(caminho_meu_projeto(nome))
         self.close()
+
+    def _on_excluir_personalizado(self):
+        from .sync import caminho_meu_projeto
+        nome = self._item_selecionado()
+        if not nome:
+            return
+        resp = QMessageBox.question(
+            self, "Excluir projeto",
+            f'Excluir o projeto salvo "{nome}"? Essa ação não pode ser desfeita.',
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if resp != QMessageBox.Yes:
+            return
+        try:
+            os.remove(caminho_meu_projeto(nome))
+            self.atualizar_status()
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Não foi possível excluir: {e}")
