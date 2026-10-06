@@ -57,11 +57,28 @@ def _arquivo_versao(gpkg_path):
     return gpkg_path + ".versao.json"
 
 
+def _http_date_para_iso(texto):
+    from email.utils import parsedate_to_datetime
+    return parsedate_to_datetime(texto).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def obter_info_remota():
-    """(atualizado_em ISO-8601, tamanho) do GPKG na Release — via API do
-    GitHub, sem baixar nada. None se não conseguir consultar. O tamanho
-    sozinho NÃO serve pra detectar mudança: o GPKG tem páginas de tamanho
-    fixo e versões diferentes costumam ter exatamente os mesmos bytes."""
+    """(atualizado_em ISO-8601 UTC, tamanho) do GPKG na Release, sem baixar.
+    O tamanho sozinho NAO serve: o GPKG tem paginas de tamanho fixo e
+    versoes diferentes costumam ter exatamente os mesmos bytes.
+    Fonte principal: HEAD no proprio arquivo (Last-Modified) — sem limite de
+    consultas. A API do GitHub so e usada de reserva: ela limita 60
+    consultas/hora por IP, e numa rede com varios computadores atras do
+    mesmo IP estoura e a checagem falharia sem aviso."""
+    try:
+        req = urllib.request.Request(URL_GPKG, headers=HEADERS, method="HEAD")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            lm = r.headers.get("Last-Modified")
+            if lm:
+                cl = r.headers.get("Content-Length")
+                return _http_date_para_iso(lm), int(cl) if cl else None
+    except Exception:
+        pass
     try:
         req = urllib.request.Request(URL_API_RELEASE, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=10) as r:
@@ -105,7 +122,10 @@ def verificar_atualizacao_disponivel(install_dir=None):
         return False, "Não foi possível checar (sem conexão?)."
 
     local = _versao_local(paths["gpkg"])
-    if remoto[0] > local:  # ISO-8601 UTC compara como texto
+    # Tolerancia: Last-Modified e updated_at (API) diferem em alguns segundos.
+    from datetime import datetime
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    if (datetime.strptime(remoto[0], fmt) - datetime.strptime(local, fmt)).total_seconds() > 120:
         return True, f"Nova versão disponível (publicada em {remoto[0][:10]})."
     return False, "Atualizado."
 
