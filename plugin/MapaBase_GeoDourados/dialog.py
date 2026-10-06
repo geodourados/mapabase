@@ -2,9 +2,10 @@ import os
 
 from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar,
-    QMessageBox, QFrame, QListWidget, QInputDialog, QLineEdit,
+    QMessageBox, QFrame, QListWidget, QInputDialog, QLineEdit, QScrollArea,
+    QWidget, QComboBox, QCheckBox, QListWidgetItem, QAbstractItemView, QApplication,
 )
-from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal, QUrl
+from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal, QUrl, QTimer
 from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices
 
 PLUGIN_DIR = os.path.dirname(__file__)
@@ -33,8 +34,18 @@ class MapaBaseDialog(QDialog):
         self.setWindowIcon(QIcon(os.path.join(PLUGIN_DIR, "icons", "icon.png")))
         self.setMinimumWidth(340)
         self.setModal(False)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint)
+        self._itens_busca = []
+        self._altura_expandida = None
+        self._primeira_exibicao = True
         self._build_ui()
         self.atualizar_status()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._primeira_exibicao:
+            self._primeira_exibicao = False
+            QTimer.singleShot(0, self._on_ajustar)
 
     def closeEvent(self, event):
         if self._on_fechar:
@@ -46,8 +57,12 @@ class MapaBaseDialog(QDialog):
         main.setContentsMargins(0, 0, 0, 0)
         main.setSpacing(0)
 
-        corpo = QVBoxLayout()
-        corpo.setContentsMargins(8, 8, 8, 8)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.NoFrame)
+        self.conteudo = QWidget()
+        corpo = QVBoxLayout(self.conteudo)
+        corpo.setContentsMargins(8, 6, 8, 8)
         corpo.setSpacing(5)
 
         header = QFrame()
@@ -72,7 +87,25 @@ class MapaBaseDialog(QDialog):
             lbl_versao.setStyleSheet("color:#cbd5e0;font-size:9px;")
             lbl_versao.setToolTip("Versão instalada do plugin")
             hl.addWidget(lbl_versao)
-        corpo.addWidget(header)
+        estilo_btn = ("QPushButton{color:white;background:transparent;border:none;font-size:13px;}"
+                      "QPushButton:hover{background:#2c5f8a;border-radius:3px;}")
+        for attr, texto, dica, slot in (
+            ("btn_recolher", "▾", "Recolher / expandir a janela", self._on_recolher),
+            ("btn_ajustar", "↕", "Auto ajustar o tamanho da janela ao conteúdo", self._on_ajustar),
+            ("btn_maximizar", "□", "Maximizar / restaurar a janela", self._on_maximizar),
+        ):
+            b = QPushButton(texto)
+            b.setToolTip(dica)
+            b.setFixedSize(22, 22)
+            b.setStyleSheet(estilo_btn)
+            b.clicked.connect(slot)
+            setattr(self, attr, b)
+            hl.addWidget(b)
+        self.topo = QWidget()
+        topo_lay = QVBoxLayout(self.topo)
+        topo_lay.setContentsMargins(8, 8, 8, 0)
+        topo_lay.addWidget(header)
+        main.addWidget(self.topo)
 
         # Status
         self.frm_status = QFrame()
@@ -120,6 +153,87 @@ class MapaBaseDialog(QDialog):
         self.btn_abrir_oficial.setFixedHeight(25)
         self.btn_abrir_oficial.clicked.connect(self._on_abrir_oficial)
         corpo.addWidget(self.btn_abrir_oficial)
+
+        # Busca
+        linha_busca = QFrame()
+        linha_busca.setFrameShape(QFrame.HLine)
+        corpo.addWidget(linha_busca)
+
+        lbl_busca = QLabel("Buscar no mapa")
+        lbl_busca.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
+        corpo.addWidget(lbl_busca)
+
+        from .busca import TIPOS
+        l1 = QHBoxLayout()
+        l1.setSpacing(3)
+        self.txt_busca = QLineEdit()
+        self.txt_busca.setPlaceholderText("Digite e tecle Enter")
+        self.txt_busca.returnPressed.connect(self._on_buscar)
+        l1.addWidget(self.txt_busca, 2)
+        self.cb_tipo = QComboBox()
+        for rotulo, chave in TIPOS:
+            self.cb_tipo.addItem(rotulo, chave)
+        self.cb_tipo.setToolTip(
+            "Inscrição e Matrícula: procuram nos lotes (por prefixo; com 'Exata', o valor completo).\n"
+            "Loteamento e Logradouro: pelo nome, em qualquer ordem e sem acento; dão zoom e piscam o contorno.")
+        l1.addWidget(self.cb_tipo, 1)
+        self.chk_exata = QCheckBox("Exata")
+        l1.addWidget(self.chk_exata)
+        corpo.addLayout(l1)
+
+        l2 = QHBoxLayout()
+        l2.setSpacing(3)
+        b_buscar = QPushButton("🔎 Buscar")
+        b_buscar.setFixedHeight(24)
+        b_buscar.setStyleSheet("QPushButton{background:#1a365d;color:white;border-radius:4px;font-weight:bold;}"
+                               "QPushButton:hover{background:#2c5f8a;}")
+        b_buscar.clicked.connect(self._on_buscar)
+        l2.addWidget(b_buscar)
+        b_limpar = QPushButton("Limpar")
+        b_limpar.setFixedHeight(24)
+        b_limpar.clicked.connect(self._on_limpar_busca)
+        l2.addWidget(b_limpar)
+        b_sel = QPushButton("Do lote selec.")
+        b_sel.setFixedHeight(24)
+        b_sel.setToolTip("Mostra o lote que está selecionado no mapa.")
+        b_sel.clicked.connect(self._on_lote_selecionado)
+        l2.addWidget(b_sel)
+        corpo.addLayout(l2)
+
+        self.lbl_busca = QLabel("")
+        self.lbl_busca.setWordWrap(True)
+        self.lbl_busca.setStyleSheet("font-size:9px;color:#555;")
+        corpo.addWidget(self.lbl_busca)
+
+        l3 = QHBoxLayout()
+        l3.setSpacing(2)
+        self.lista_busca = QListWidget()
+        self.lista_busca.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lista_busca.itemClicked.connect(self._on_resultado_clicado)
+        self.lista_busca.itemActivated.connect(self._on_resultado_clicado)
+        self.lista_busca.setFixedHeight(60)
+        l3.addWidget(self.lista_busca, 1)
+        col = QVBoxLayout()
+        col.setSpacing(2)
+        b_zoom = QPushButton("🔍")
+        b_zoom.setToolTip("Zoom em todos os resultados selecionados (Ctrl/Shift+clique para vários).")
+        b_zoom.setFixedSize(24, 22)
+        b_zoom.clicked.connect(self._on_zoom_selecionados)
+        col.addWidget(b_zoom)
+        b_alt = QPushButton("↕")
+        b_alt.setToolTip("Ajustar a altura da lista ao número de resultados.")
+        b_alt.setFixedSize(24, 22)
+        b_alt.clicked.connect(self._ajustar_altura_lista)
+        col.addWidget(b_alt)
+        col.addStretch()
+        l3.addLayout(col)
+        corpo.addLayout(l3)
+
+        self.btn_tabela = QPushButton("📋  Tabela de atributos")
+        self.btn_tabela.setFixedHeight(25)
+        self.btn_tabela.setToolTip("Abre a tabela de atributos da camada ativa (ou dos lotes, se nenhuma estiver ativa).")
+        self.btn_tabela.clicked.connect(self._on_tabela_atributos)
+        corpo.addWidget(self.btn_tabela)
 
         # Croqui (PDF)
         linha_croqui = QFrame()
@@ -228,7 +342,8 @@ class MapaBaseDialog(QDialog):
         btn_fechar.clicked.connect(self.close)
         corpo.addWidget(btn_fechar)
 
-        main.addLayout(corpo)
+        self.scroll.setWidget(self.conteudo)
+        main.addWidget(self.scroll)
 
     # ── Status ───────────────────────────────────────────────────────────
     def atualizar_status(self):
@@ -335,16 +450,128 @@ class MapaBaseDialog(QDialog):
         self.iface.addProject(uri)
         self.close()
 
+    # ── Janela: recolher / auto ajustar / maximizar ──────────────────────
+    def _area_disponivel(self):
+        try:
+            tela = self.screen() or QApplication.primaryScreen()
+        except Exception:
+            tela = QApplication.primaryScreen()
+        return tela.availableGeometry()
+
+    def _on_recolher(self):
+        if self.isMaximized():
+            self.showNormal()
+            self.btn_maximizar.setText("□")
+        if self.scroll.isHidden():
+            self.scroll.show()
+            self.btn_recolher.setText("▾")
+            self.setMinimumHeight(0)
+            self.resize(self.width(), self._altura_expandida or self.sizeHint().height())
+        else:
+            self._altura_expandida = self.height()
+            self.scroll.hide()
+            self.btn_recolher.setText("▴")
+            self.setMinimumHeight(0)
+            self.resize(self.width(), self.topo.sizeHint().height() + 4)
+
+    def _on_ajustar(self):
+        if self.isMaximized():
+            self.showNormal()
+            self.btn_maximizar.setText("□")
+        if self.scroll.isHidden():
+            self.scroll.show()
+            self.btn_recolher.setText("▾")
+        area = self._area_disponivel()
+        alvo = self.topo.sizeHint().height() + self.conteudo.sizeHint().height() + 6
+        altura = min(alvo, int(area.height() * 0.92))
+        self.resize(self.width(), altura)
+        if self.y() + altura > area.bottom():
+            self.move(self.x(), max(area.top(), area.bottom() - altura))
+
+    def _on_maximizar(self):
+        if self.scroll.isHidden():
+            self.scroll.show()
+            self.btn_recolher.setText("▾")
+        if self.isMaximized():
+            self.showNormal()
+            self.btn_maximizar.setText("□")
+        else:
+            self.showMaximized()
+            self.btn_maximizar.setText("❐")
+
+    # ── Busca ────────────────────────────────────────────────────────────
+    def _on_buscar(self):
+        from qgis.core import QgsProject
+        from . import busca
+        termo = self.txt_busca.text().strip()
+        if not termo:
+            self.lbl_busca.setText("Digite o que procurar.")
+            return
+        itens, msg = busca.buscar(QgsProject.instance(), self.cb_tipo.currentData(), termo, self.chk_exata.isChecked())
+        self._mostrar_resultados(itens, msg)
+        if len(itens) == 1:
+            busca.zoom_itens(self.iface, itens)
+
+    def _mostrar_resultados(self, itens, msg):
+        self._itens_busca = itens
+        self.lista_busca.clear()
+        for i, it in enumerate(itens):
+            li = QListWidgetItem(it["rotulo"])
+            li.setData(Qt.UserRole, i)
+            self.lista_busca.addItem(li)
+        self.lbl_busca.setText(msg)
+        self._ajustar_altura_lista()
+
+    def _ajustar_altura_lista(self):
+        n = self.lista_busca.count()
+        altura_linha = self.lista_busca.sizeHintForRow(0) if n > 0 else 18
+        linhas = min(max(n, 3), 12)
+        self.lista_busca.setFixedHeight(altura_linha * linhas + 2 * self.lista_busca.frameWidth() + 4)
+
+    def _itens_do_clique(self, itens_lista):
+        return [self._itens_busca[li.data(Qt.UserRole)] for li in itens_lista]
+
+    def _on_resultado_clicado(self, item):
+        from . import busca
+        busca.zoom_itens(self.iface, self._itens_do_clique([item]))
+
+    def _on_zoom_selecionados(self):
+        from . import busca
+        sel = self.lista_busca.selectedItems()
+        if sel:
+            busca.zoom_itens(self.iface, self._itens_do_clique(sel))
+
+    def _on_limpar_busca(self):
+        self.txt_busca.clear()
+        self._mostrar_resultados([], "")
+
+    def _on_lote_selecionado(self):
+        from qgis.core import QgsProject
+        from . import busca
+        item, msg = busca.lote_selecionado(QgsProject.instance())
+        if item is None:
+            self.lbl_busca.setText(msg)
+            return
+        self._mostrar_resultados([item], "Lote selecionado no mapa.")
+        busca.zoom_itens(self.iface, [item], piscar=False)
+
+    def _on_tabela_atributos(self):
+        from qgis.core import QgsProject
+        from .camadas import camadas_principais
+        camada = self.iface.activeLayer()
+        if camada is None or camada.type() != camada.VectorLayer:
+            camada = camadas_principais(QgsProject.instance())["lotes"]
+        if camada is None:
+            QMessageBox.warning(self, "Sem camada", "Abra o projeto oficial (ou selecione uma camada vetorial) primeiro.")
+            return
+        self.iface.showAttributeTable(camada)
+
     # ── Croqui ───────────────────────────────────────────────────────────
     def _on_gerar_croqui(self, escala_fixa):
         from .sync import get_local_paths
         from . import croqui
 
         paths = get_local_paths()
-        if not os.path.exists(paths["gpkg"]):
-            QMessageBox.warning(self, "Não instalado", "Baixe o Mapa Base primeiro.")
-            return
-
         ok, msg = croqui.gerar_croqui(self.iface, paths["gpkg"], escala_fixa=escala_fixa)
         if ok:
             QMessageBox.information(self, "Croqui gerado", msg)

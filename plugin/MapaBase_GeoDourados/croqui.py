@@ -52,16 +52,10 @@ def obter_base_atualizada_em(gpkg_path):
 
 
 def resolver_layer_lotes(project):
-    """Acha a camada de lotes pelo NOME DA TABELA dentro do GPKG
-    (lotes_fiscais), não pelo nome de exibição — funciona mesmo que o
-    usuário tenha renomeado a camada no projeto oficial."""
-    for layer in project.mapLayers().values():
-        if layer.type() != layer.VectorLayer:
-            continue
-        origem = layer.source() or ""
-        if f"layername={NOME_LAYER_GPKG_LOTES}" in origem:
-            return layer
-    return None
+    """Acha a camada de lotes pela TABELA de origem (lotes_fiscais), nos dois
+    projetos: o oficial offline (GeoPackage) e o Fonte (PostgreSQL)."""
+    from .camadas import resolver_layer, TABELA_LOTES
+    return resolver_layer(project, TABELA_LOTES)
 
 
 def gerar_croqui(iface, gpkg_path, escala_fixa=1000):
@@ -91,6 +85,10 @@ def gerar_croqui(iface, gpkg_path, escala_fixa=1000):
 
     ip_local = obter_ip_local()
     base_em = obter_base_atualizada_em(gpkg_path)
+    if layer_lotes.providerType() == "postgres":
+        # Projeto Fonte: dados ao vivo do banco, não de um GPKG exportado.
+        import datetime
+        base_em = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     campos = [f.name() for f in feat.fields()]
     lote_id = feat["id"] if "id" in campos else feat.id()
 
