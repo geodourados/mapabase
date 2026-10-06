@@ -20,7 +20,7 @@ if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
 echo.
 echo Instalando/atualizando o plugin do Mapa Base no QGIS...
 powershell -NoProfile -Command ^
-    "try {" ^
+    "$ProgressPreference='SilentlyContinue'; try {" ^
     "  $tmpZip = Join-Path $env:TEMP 'MapaBase_GeoDourados_plugin.zip';" ^
     "  Invoke-WebRequest -Uri '%URL_PLUGIN%' -OutFile $tmpZip -UseBasicParsing;" ^
     "  $destino = '%PLUGIN_DIR%';" ^
@@ -36,23 +36,26 @@ powershell -NoProfile -Command ^
     "  Set-Content -Path $iniPath -Value $c -Encoding UTF8 -NoNewline;" ^
     "} catch { Write-Output ('ERRO: ' + $_.Exception.Message); exit 1 }"
 if errorlevel 1 (
-    echo AVISO: falha ao instalar o plugin — a base ainda sera baixada, mas sem o aviso automatico de atualizacao.
+    echo AVISO: falha ao instalar o plugin - a base ainda sera baixada, mas sem o aviso automatico de atualizacao.
 )
 
 set "PRECISA_BAIXAR=1"
 if exist "%DEST_GPKG%" (
     echo Verificando se ha atualizacao disponivel...
     set "STATUS="
+    REM Compara a DATA de publicacao (Last-Modified) com a da versao baixada
+    REM (arquivo .versao.json, ou a data do proprio arquivo se nao existir).
+    REM Nao compara tamanho: o GPKG tem tamanho fixo entre versoes.
     for /f "usebackq delims=" %%S in (`powershell -NoProfile -Command ^
-        "$ErrorActionPreference='Stop'; $l=(Get-Item '%DEST_GPKG%').Length; try { $r=(Invoke-WebRequest -Uri '%URL_GPKG%' -Method Head -UseBasicParsing).Headers['Content-Length']; $r=[int64]$r[0] } catch { Write-Output 'erro'; exit }; if ([Math]::Abs($r-$l) -le 1024) { Write-Output 'atualizado' } else { Write-Output 'desatualizado' }"`) do set "STATUS=%%S"
+        "$ErrorActionPreference='Stop'; $c=[Globalization.CultureInfo]::InvariantCulture; $u=[Globalization.DateTimeStyles]::AdjustToUniversal; try { $h=(Invoke-WebRequest -Uri '%URL_GPKG%' -Method Head -UseBasicParsing).Headers['Last-Modified']; if ($h -is [array]) { $h=$h[0] }; $r=[datetime]::Parse($h,$c,$u) } catch { Write-Output 'erro'; exit }; $v='%DEST_GPKG%.versao.json'; if (Test-Path $v) { $l=[datetime]::Parse((Get-Content $v -Raw | ConvertFrom-Json).atualizado_em,$c,$u) } else { $l=(Get-Item '%DEST_GPKG%').LastWriteTimeUtc }; if (($r-$l).TotalSeconds -gt 120) { Write-Output 'desatualizado' } else { Write-Output 'atualizado' }"`) do set "STATUS=%%S"
 
     if "!STATUS!"=="atualizado" (
-        echo Ja esta na versao mais recente — pulando download.
+        echo Ja esta na versao mais recente - pulando download.
         set "PRECISA_BAIXAR=0"
     ) else if "!STATUS!"=="desatualizado" (
         echo Nova versao disponivel.
     ) else (
-        echo Nao foi possivel verificar — baixando por seguranca.
+        echo Nao foi possivel verificar - baixando por seguranca.
     )
 )
 
@@ -62,7 +65,7 @@ if "!PRECISA_BAIXAR!"=="1" (
     echo   %URL_GPKG%
     echo   -^> %DEST_GPKG%
     echo.
-    powershell -NoProfile -Command "try { Invoke-WebRequest -Uri '%URL_GPKG%' -OutFile '%DEST_GPKG%.tmp' -UseBasicParsing } catch { exit 1 }"
+    powershell -NoProfile -Command "$ProgressPreference='SilentlyContinue'; try { $r=Invoke-WebRequest -Uri '%URL_GPKG%' -OutFile '%DEST_GPKG%.tmp' -UseBasicParsing -PassThru; $h=$r.Headers['Last-Modified']; if ($h -is [array]) { $h=$h[0] }; $d=[datetime]::Parse($h,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::AdjustToUniversal); $q=[char]34; Set-Content -Path '%DEST_GPKG%.versao.tmp' -Value ('{' + $q + 'atualizado_em' + $q + ': ' + $q + $d.ToString('yyyy-MM-ddTHH:mm:ssZ') + $q + '}') -Encoding ASCII } catch { exit 1 }"
     if errorlevel 1 (
         echo.
         echo ERRO: falha no download. Verifique sua conexao com a internet.
@@ -70,6 +73,7 @@ if "!PRECISA_BAIXAR!"=="1" (
         exit /b 1
     )
     move /y "%DEST_GPKG%.tmp" "%DEST_GPKG%" >nul
+    if exist "%DEST_GPKG%.versao.tmp" move /y "%DEST_GPKG%.versao.tmp" "%DEST_GPKG%.versao.json" >nul
     if errorlevel 1 (
         echo.
         echo ERRO: nao foi possivel substituir o arquivo atual.
@@ -99,7 +103,7 @@ if not defined QGIS_EXE if exist "C:\OSGeo4W64\bin\qgis-ltr-bin.exe" set "QGIS_E
 if not defined QGIS_EXE (
     echo.
     echo QGIS nao foi encontrado em "C:\Program Files".
-    echo O download terminou normalmente — abra manualmente pelo QGIS:
+    echo O download terminou normalmente - abra manualmente pelo QGIS:
     echo   %DEST_GPKG%
     echo ^(projeto: %NOME_PROJETO%^)
     pause
@@ -107,7 +111,7 @@ if not defined QGIS_EXE (
 )
 
 echo Abrindo o projeto no QGIS...
-REM "--project" e necessario — passar a URI geopackage: como argumento
+REM "--project" e necessario - passar a URI geopackage: como argumento
 REM posicional simples faz o QGIS tratar como caminho relativo e falhar
 REM ("nao e uma fonte de dados valida"), mesmo sendo um caminho absoluto.
 start "" "%QGIS_EXE%" --project "geopackage:%DEST_GPKG%?projectName=%NOME_PROJETO%"
