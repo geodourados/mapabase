@@ -65,6 +65,13 @@ class MapaBaseDialog(QDialog):
         tl.setWordWrap(False)
         hl.addWidget(tl)
         hl.addStretch()
+        from .sync import versao_plugin_local
+        versao = versao_plugin_local()
+        if versao:
+            lbl_versao = QLabel(f"v{versao}")
+            lbl_versao.setStyleSheet("color:#cbd5e0;font-size:9px;")
+            lbl_versao.setToolTip("Versão instalada do plugin")
+            hl.addWidget(lbl_versao)
         corpo.addWidget(header)
 
         # Status
