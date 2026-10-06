@@ -41,6 +41,9 @@ class MapaBaseDialog(QWidget):
         self._largura_antes = None
         self._recolhido = False
         self._largura_recolher = None
+        self._dual = None
+        self._camada_tabela = None
+        self._timer_tabela = None
         self.dock = None
         self._build_ui()
 
@@ -232,9 +235,41 @@ class MapaBaseDialog(QWidget):
 
         self.btn_tabela = QPushButton("📋  Tabela de atributos")
         self.btn_tabela.setFixedHeight(25)
-        self.btn_tabela.setToolTip("Abre a tabela de atributos da camada ativa (ou dos lotes, se nenhuma estiver ativa).")
+        self.btn_tabela.setToolTip("Mostra, aqui no painel, a tabela de atributos das feições selecionadas "
+                                   "(da camada ativa, ou dos lotes se nenhuma estiver ativa).")
         self.btn_tabela.clicked.connect(self._on_tabela_atributos)
         corpo.addWidget(self.btn_tabela)
+
+        # Tabela de atributos embutida no painel
+        self.frm_tabela = QFrame()
+        self.frm_tabela.setStyleSheet("QFrame#frmTabela{border:1px solid #cbd5e0;border-radius:4px;}")
+        self.frm_tabela.setObjectName("frmTabela")
+        self.lay_tabela = QVBoxLayout(self.frm_tabela)
+        self.lay_tabela.setContentsMargins(4, 4, 4, 4)
+        self.lay_tabela.setSpacing(3)
+        topo_t = QHBoxLayout()
+        self.lbl_tabela = QLabel("")
+        self.lbl_tabela.setStyleSheet("font-size:9px;font-weight:bold;color:#1a365d;")
+        self.lbl_tabela.setWordWrap(True)
+        topo_t.addWidget(self.lbl_tabela, 1)
+        self.chk_so_selecionados = QCheckBox("Só selecionados")
+        self.chk_so_selecionados.setChecked(True)
+        self.chk_so_selecionados.setStyleSheet("font-size:9px;")
+        self.chk_so_selecionados.toggled.connect(lambda _=None: self._atualizar_tabela())
+        topo_t.addWidget(self.chk_so_selecionados)
+        b_janela = QPushButton("↗")
+        b_janela.setToolTip("Abrir a tabela completa numa janela separada do QGIS.")
+        b_janela.setFixedSize(22, 20)
+        b_janela.clicked.connect(self._on_tabela_em_janela)
+        topo_t.addWidget(b_janela)
+        b_fechar_t = QPushButton("✕")
+        b_fechar_t.setToolTip("Fechar a tabela.")
+        b_fechar_t.setFixedSize(22, 20)
+        b_fechar_t.clicked.connect(self._on_fechar_tabela)
+        topo_t.addWidget(b_fechar_t)
+        self.lay_tabela.addLayout(topo_t)
+        self.frm_tabela.setVisible(False)
+        corpo.addWidget(self.frm_tabela)
 
         # Croqui (PDF)
         linha_croqui = QFrame()
@@ -599,16 +634,87 @@ class MapaBaseDialog(QWidget):
         self._mostrar_resultados([item], "Lote selecionado no mapa.")
         busca.zoom_itens(self.iface, [item], piscar=False)
 
-    def _on_tabela_atributos(self):
+    def _camada_da_tabela(self):
         from qgis.core import QgsProject
         from .camadas import camadas_principais
         camada = self.iface.activeLayer()
         if camada is None or camada.type() != camada.VectorLayer:
             camada = camadas_principais(QgsProject.instance())["lotes"]
+        return camada
+
+    def _on_tabela_atributos(self):
+        camada = self._camada_da_tabela()
         if camada is None:
             QMessageBox.warning(self, "Sem camada", "Abra o projeto oficial (ou selecione uma camada vetorial) primeiro.")
             return
-        self.iface.showAttributeTable(camada)
+        self._trocar_camada_tabela(camada)
+        self.frm_tabela.setVisible(True)
+        self._atualizar_tabela()
+
+    def _trocar_camada_tabela(self, camada):
+        # Acompanha a seleção da camada mostrada (com pequeno atraso, p/ não recarregar a cada clique).
+        if self._camada_tabela is not None:
+            try:
+                self._camada_tabela.selectionChanged.disconnect(self._agendar_tabela)
+            except Exception:
+                pass
+        self._camada_tabela = camada
+        camada.selectionChanged.connect(self._agendar_tabela)
+
+    def _agendar_tabela(self, *args):
+        if not self.frm_tabela.isVisible():
+            return
+        if self._timer_tabela is None:
+            self._timer_tabela = QTimer(self)
+            self._timer_tabela.setSingleShot(True)
+            self._timer_tabela.timeout.connect(self._atualizar_tabela)
+        self._timer_tabela.start(250)
+
+    def _atualizar_tabela(self):
+        from qgis.core import QgsFeatureRequest
+        from qgis.gui import QgsDualView, QgsAttributeEditorContext
+        camada = self._camada_tabela
+        if camada is None:
+            return
+        so_sel = self.chk_so_selecionados.isChecked()
+        req = QgsFeatureRequest()
+        if so_sel:
+            ids = list(camada.selectedFeatureIds())
+            req.setFilterFids(ids)
+            self.lbl_tabela.setText(f"{camada.name()} — {len(ids)} selecionado(s)")
+        else:
+            limite = 5000
+            req.setLimit(limite)
+            total = camada.featureCount()
+            extra = f" (mostrando os {limite} primeiros)" if total > limite else ""
+            self.lbl_tabela.setText(f"{camada.name()} — {total} feição(ões){extra}")
+        if self._dual is not None:
+            self.lay_tabela.removeWidget(self._dual)
+            self._dual.hide()
+            self._dual.deleteLater()
+            self._dual = None
+        if so_sel and not ids:
+            self.lbl_tabela.setText(f"{camada.name()} — nenhuma feição selecionada (selecione no mapa ou use a busca)")
+            return
+        dv = QgsDualView(self.frm_tabela)
+        dv.init(camada, self.iface.mapCanvas(), req, QgsAttributeEditorContext())
+        dv.setView(QgsDualView.AttributeTable)
+        linhas = len(ids) if so_sel else 10
+        dv.setMinimumHeight(min(220, 64 + 24 * max(linhas, 1)))
+        self.lay_tabela.addWidget(dv, 1)
+        self._dual = dv
+
+    def _on_tabela_em_janela(self):
+        if self._camada_tabela is not None:
+            self.iface.showAttributeTable(self._camada_tabela)
+
+    def _on_fechar_tabela(self):
+        self.frm_tabela.setVisible(False)
+        if self._dual is not None:
+            self.lay_tabela.removeWidget(self._dual)
+            self._dual.hide()
+            self._dual.deleteLater()
+            self._dual = None
 
     # ── Croqui ───────────────────────────────────────────────────────────
     def _on_gerar_croqui(self, escala_fixa):

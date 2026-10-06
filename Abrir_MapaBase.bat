@@ -20,7 +20,7 @@ if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
 echo.
 echo Instalando/atualizando o plugin do Mapa Base no QGIS...
 powershell -NoProfile -Command ^
-    "$ProgressPreference='SilentlyContinue'; try {" ^
+    "$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try {" ^
     "  $tmpZip = Join-Path $env:TEMP 'MapaBase_GeoDourados_plugin.zip';" ^
     "  Invoke-WebRequest -Uri '%URL_PLUGIN%' -OutFile $tmpZip -UseBasicParsing;" ^
     "  $destino = '%PLUGIN_DIR%';" ^
@@ -47,7 +47,7 @@ if exist "%DEST_GPKG%" (
     REM (arquivo .versao.json, ou a data do proprio arquivo se nao existir).
     REM Nao compara tamanho: o GPKG tem tamanho fixo entre versoes.
     for /f "usebackq delims=" %%S in (`powershell -NoProfile -Command ^
-        "$ErrorActionPreference='Stop'; $c=[Globalization.CultureInfo]::InvariantCulture; $u=[Globalization.DateTimeStyles]::AdjustToUniversal; try { $h=(Invoke-WebRequest -Uri '%URL_GPKG%' -Method Head -UseBasicParsing).Headers['Last-Modified']; if ($h -is [array]) { $h=$h[0] }; $r=[datetime]::Parse($h,$c,$u) } catch { Write-Output 'erro'; exit }; $v='%DEST_GPKG%.versao.json'; if (Test-Path $v) { $l=[datetime]::Parse((Get-Content $v -Raw | ConvertFrom-Json).atualizado_em,$c,$u) } else { $l=(Get-Item '%DEST_GPKG%').LastWriteTimeUtc }; if (($r-$l).TotalSeconds -gt 120) { Write-Output 'desatualizado' } else { Write-Output 'atualizado' }"`) do set "STATUS=%%S"
+        "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $c=[Globalization.CultureInfo]::InvariantCulture; $u=[Globalization.DateTimeStyles]::AdjustToUniversal; try { $h=(Invoke-WebRequest -Uri '%URL_GPKG%' -Method Head -UseBasicParsing).Headers['Last-Modified']; if ($h -is [array]) { $h=$h[0] }; $r=[datetime]::Parse($h,$c,$u) } catch { Write-Output 'erro'; exit }; $v='%DEST_GPKG%.versao.json'; if (Test-Path $v) { $l=[datetime]::Parse((Get-Content $v -Raw | ConvertFrom-Json).atualizado_em,$c,$u) } else { $l=(Get-Item '%DEST_GPKG%').LastWriteTimeUtc }; if (($r-$l).TotalSeconds -gt 120) { Write-Output 'desatualizado' } else { Write-Output 'atualizado' }"`) do set "STATUS=%%S"
 
     if "!STATUS!"=="atualizado" (
         echo Ja esta na versao mais recente - pulando download.
@@ -65,7 +65,7 @@ if "!PRECISA_BAIXAR!"=="1" (
     echo   %URL_GPKG%
     echo   -^> %DEST_GPKG%
     echo.
-    powershell -NoProfile -Command "$ProgressPreference='SilentlyContinue'; try { $r=Invoke-WebRequest -Uri '%URL_GPKG%' -OutFile '%DEST_GPKG%.tmp' -UseBasicParsing -PassThru; $h=$r.Headers['Last-Modified']; if ($h -is [array]) { $h=$h[0] }; $d=[datetime]::Parse($h,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::AdjustToUniversal); $q=[char]34; Set-Content -Path '%DEST_GPKG%.versao.tmp' -Value ('{' + $q + 'atualizado_em' + $q + ': ' + $q + $d.ToString('yyyy-MM-ddTHH:mm:ssZ') + $q + '}') -Encoding ASCII } catch { exit 1 }"
+    powershell -NoProfile -Command "$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try { $r=Invoke-WebRequest -Uri '%URL_GPKG%' -OutFile '%DEST_GPKG%.tmp' -UseBasicParsing -PassThru; $h=$r.Headers['Last-Modified']; if ($h -is [array]) { $h=$h[0] }; $d=[datetime]::Parse($h,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::AdjustToUniversal); $q=[char]34; Set-Content -Path '%DEST_GPKG%.versao.tmp' -Value ('{' + $q + 'atualizado_em' + $q + ': ' + $q + $d.ToString('yyyy-MM-ddTHH:mm:ssZ') + $q + '}') -Encoding ASCII } catch { exit 1 }"
     if errorlevel 1 (
         echo.
         echo ERRO: falha no download. Verifique sua conexao com a internet.
@@ -87,11 +87,11 @@ if "!PRECISA_BAIXAR!"=="1" (
 echo Procurando instalacao do QGIS...
 set "QGIS_EXE="
 
-REM Instalador standalone (C:\Program Files\QGIS x.y\bin\qgis-bin.exe)
-if not defined QGIS_EXE (
-    for /f "delims=" %%Q in ('dir /b /s "C:\Program Files\QGIS*\bin\qgis-bin.exe" 2^>nul') do (
-        if not defined QGIS_EXE set "QGIS_EXE=%%Q"
-    )
+REM Instalador standalone (C:\Program Files\QGIS x.y.z\bin). O nome da pasta tem a versao,
+REM entao percorre todas; a ultima (versao mais nova) vence. Aceita qgis-bin e qgis-ltr-bin.
+for /d %%D in ("C:\Program Files\QGIS*") do (
+    if exist "%%D\bin\qgis-bin.exe" set "QGIS_EXE=%%D\bin\qgis-bin.exe"
+    if exist "%%D\bin\qgis-ltr-bin.exe" set "QGIS_EXE=%%D\bin\qgis-ltr-bin.exe"
 )
 
 REM Instalador OSGeo4W (padrao ou LTR)
