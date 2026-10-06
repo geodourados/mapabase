@@ -914,7 +914,7 @@ class MapaBaseDialog(QWidget):
             texto = self._texto_valor(camada, i, feat.attribute(i))
             rot = QLabel(camada.attributeDisplayName(i))
             rot.setStyleSheet("color:#4a5568;font-weight:bold;")
-            rot.setAlignment(Qt.AlignRight | Qt.AlignTop)
+            rot.setAlignment(Qt.AlignLeft | Qt.AlignTop)
             val = QLabel(texto if texto != "" else "—")
             val.setWordWrap(True)
             val.setTextInteractionFlags(Qt.TextSelectableByMouse)
