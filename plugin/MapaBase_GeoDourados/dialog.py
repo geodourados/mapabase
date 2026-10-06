@@ -25,32 +25,28 @@ class DownloadWorker(QThread):
         self.finished.emit(ok, err)
 
 
-class MapaBaseDialog(QDialog):
+class MapaBaseDialog(QWidget):
     def __init__(self, iface, on_fechar=None):
-        super().__init__(iface.mainWindow())
+        super().__init__()
         self.iface = iface
         self._on_fechar = on_fechar
         self.setWindowTitle("Mapa Base - GeoDourados")
         self.setWindowIcon(QIcon(os.path.join(PLUGIN_DIR, "icons", "icon.png")))
         self.setMinimumWidth(340)
-        self.setModal(False)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint)
         self._itens_busca = []
         self._altura_expandida = None
         self._primeira_exibicao = True
+        self._largura_antes = None
+        self.dock = None
         self._build_ui()
-        self.atualizar_status()
 
     def showEvent(self, event):
         super().showEvent(event)
+        # Checagem de rede só depois de pintar a tela (não trava a abertura).
+        QTimer.singleShot(50, self.atualizar_status)
         if self._primeira_exibicao:
             self._primeira_exibicao = False
-            QTimer.singleShot(0, self._on_ajustar)
-
-    def closeEvent(self, event):
-        if self._on_fechar:
-            self._on_fechar()
-        super().closeEvent(event)
+            QTimer.singleShot(100, self._on_ajustar)
 
     def _build_ui(self):
         main = QVBoxLayout(self)
@@ -77,7 +73,7 @@ class MapaBaseDialog(QDialog):
             hl.addWidget(lbl)
         tl = QLabel("Mapa Base Digital da Cidade de Dourados - MS")
         tl.setStyleSheet("color:white;font-size:9px;font-weight:bold;")
-        tl.setWordWrap(False)
+        tl.setWordWrap(True)
         hl.addWidget(tl)
         hl.addStretch()
         from .sync import versao_plugin_local
@@ -90,9 +86,9 @@ class MapaBaseDialog(QDialog):
         estilo_btn = ("QPushButton{color:white;background:transparent;border:none;font-size:13px;}"
                       "QPushButton:hover{background:#2c5f8a;border-radius:3px;}")
         for attr, texto, dica, slot in (
-            ("btn_recolher", "▾", "Recolher / expandir a janela", self._on_recolher),
-            ("btn_ajustar", "↕", "Auto ajustar o tamanho da janela ao conteúdo", self._on_ajustar),
-            ("btn_maximizar", "□", "Maximizar / restaurar a janela", self._on_maximizar),
+            ("btn_recolher", "▾", "Recolher o painel (reabra pelo botão Mapa Base na barra de ferramentas)", self._on_recolher),
+            ("btn_ajustar", "↕", "Auto ajustar a largura do painel ao conteúdo", self._on_ajustar),
+            ("btn_maximizar", "□", "Alargar / restaurar o painel", self._on_maximizar),
         ):
             b = QPushButton(texto)
             b.setToolTip(dica)
@@ -339,7 +335,7 @@ class MapaBaseDialog(QDialog):
 
         btn_fechar = QPushButton("Fechar")
         btn_fechar.setFixedHeight(24)
-        btn_fechar.clicked.connect(self.close)
+        btn_fechar.clicked.connect(self._on_recolher)
         corpo.addWidget(btn_fechar)
 
         self.scroll.setWidget(self.conteudo)
@@ -448,9 +444,8 @@ class MapaBaseDialog(QDialog):
             return
         uri = f"geopackage:{paths['gpkg']}?projectName={PROJETO_NOME}"
         self.iface.addProject(uri)
-        self.close()
 
-    # ── Janela: recolher / auto ajustar / maximizar ──────────────────────
+    # ── Painel: recolher / auto ajustar / alargar ─────────────────────────
     def _area_disponivel(self):
         try:
             tela = self.screen() or QApplication.primaryScreen()
@@ -458,46 +453,39 @@ class MapaBaseDialog(QDialog):
             tela = QApplication.primaryScreen()
         return tela.availableGeometry()
 
-    def _on_recolher(self):
-        if self.isMaximized():
-            self.showNormal()
-            self.btn_maximizar.setText("□")
-        if self.scroll.isHidden():
-            self.scroll.show()
-            self.btn_recolher.setText("▾")
-            self.setMinimumHeight(0)
-            self.resize(self.width(), self._altura_expandida or self.sizeHint().height())
+    def _definir_largura(self, largura):
+        dock = self.dock
+        if dock is None:
+            return
+        if dock.isFloating():
+            area = self._area_disponivel()
+            self.dock.resize(largura, min(self.dock.height(), int(area.height() * 0.92)))
         else:
-            self._altura_expandida = self.height()
-            self.scroll.hide()
-            self.btn_recolher.setText("▴")
-            self.setMinimumHeight(0)
-            self.resize(self.width(), self.topo.sizeHint().height() + 4)
+            self.iface.mainWindow().resizeDocks([dock], [largura], Qt.Horizontal)
+
+    def _on_recolher(self):
+        # Esconde o painel; o botão do plugin na barra de ferramentas reabre.
+        if self.dock is not None:
+            self.dock.hide()
 
     def _on_ajustar(self):
-        if self.isMaximized():
-            self.showNormal()
-            self.btn_maximizar.setText("□")
-        if self.scroll.isHidden():
-            self.scroll.show()
-            self.btn_recolher.setText("▾")
-        area = self._area_disponivel()
-        alvo = self.topo.sizeHint().height() + self.conteudo.sizeHint().height() + 6
-        altura = min(alvo, int(area.height() * 0.92))
-        self.resize(self.width(), altura)
-        if self.y() + altura > area.bottom():
-            self.move(self.x(), max(area.top(), area.bottom() - altura))
+        largura = max(self.conteudo.sizeHint().width() + 28, 360)
+        self._definir_largura(largura)
+        self._largura_antes = None
+        self.btn_maximizar.setText("□")
 
     def _on_maximizar(self):
-        if self.scroll.isHidden():
-            self.scroll.show()
-            self.btn_recolher.setText("▾")
-        if self.isMaximized():
-            self.showNormal()
-            self.btn_maximizar.setText("□")
-        else:
-            self.showMaximized()
+        dock = self.dock
+        if dock is None:
+            return
+        if self._largura_antes is None:
+            self._largura_antes = dock.width()
+            self._definir_largura(int(self.iface.mainWindow().width() * 0.5))
             self.btn_maximizar.setText("❐")
+        else:
+            self._definir_largura(self._largura_antes)
+            self._largura_antes = None
+            self.btn_maximizar.setText("□")
 
     # ── Busca ────────────────────────────────────────────────────────────
     def _on_buscar(self):
@@ -624,7 +612,6 @@ class MapaBaseDialog(QDialog):
         if not nome:
             return
         self.iface.addProject(caminho_meu_projeto(nome))
-        self.close()
 
     def _on_excluir_personalizado(self):
         from .sync import caminho_meu_projeto

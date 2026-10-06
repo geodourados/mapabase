@@ -3,7 +3,7 @@ import os
 from qgis.core import Qgis
 from qgis.PyQt.QtCore import QSize, Qt, QThread, pyqtSignal
 from qgis.PyQt.QtGui import QColor, QIcon, QPainter, QPixmap
-from qgis.PyQt.QtWidgets import QAction, QToolBar
+from qgis.PyQt.QtWidgets import QAction, QDockWidget, QToolBar
 
 PLUGIN_DIR = os.path.dirname(__file__)
 
@@ -47,23 +47,41 @@ class MapaBaseGeoDouradosPlugin:
         self._toolbar.setIconSize(QSize(24, 24))
         self._toolbar.addAction(self.action)
 
+        # Painel acoplado à direita (começa escondido; o botão da barra abre).
+        from .dialog import MapaBaseDialog
+        self.dialog = MapaBaseDialog(self.iface, on_fechar=self._checar_atualizacao_em_segundo_plano)
+        self.dock = QDockWidget("Mapa Base - GeoDourados", self.iface.mainWindow())
+        self.dock.setObjectName("MapaBaseGeoDouradosDock")
+        self.dock.setWidget(self.dialog)
+        self.dialog.dock = self.dock
+        self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock)
+        self.dock.hide()
+        self.dock.visibilityChanged.connect(self._on_visibilidade_dock)
+
         # Checa atualização em segundo plano, sem travar a abertura do QGIS.
         self._checar_atualizacao_em_segundo_plano()
 
     def unload(self):
         self.iface.removePluginMenu("Mapa Base - GeoDourados", self.action)
+        if getattr(self, "dock", None):
+            self.iface.removeDockWidget(self.dock)
+            self.dock.deleteLater()
+            self.dock = None
         if hasattr(self, "_toolbar") and self._toolbar:
             self._toolbar.deleteLater()
             self._toolbar = None
 
     def run(self):
-        from .dialog import MapaBaseDialog
-        if not self.dialog:
-            self.dialog = MapaBaseDialog(self.iface, on_fechar=self._checar_atualizacao_em_segundo_plano)
-        self.dialog.show()
-        self.dialog.raise_()
-        self.dialog.activateWindow()
-        self.dialog.atualizar_status()
+        # Botão da barra de ferramentas: abre o painel (acoplado à direita) ou recolhe.
+        if self.dock.isVisible():
+            self.dock.hide()
+        else:
+            self.dock.show()
+            self.dock.raise_()
+
+    def _on_visibilidade_dock(self, visivel):
+        if not visivel:
+            self._checar_atualizacao_em_segundo_plano()
 
     # ── Indicador de atualização disponível (badge no ícone) ───────────────
     def _gerar_icone_com_aviso(self):
