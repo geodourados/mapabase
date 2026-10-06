@@ -7,7 +7,7 @@ from qgis.PyQt.QtWidgets import (
     QTabWidget, QStackedWidget, QSizePolicy,
 )
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal, QUrl, QTimer
-from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices
+from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontMetrics
 
 PLUGIN_DIR = os.path.dirname(__file__)
 
@@ -99,7 +99,14 @@ class MapaBaseDialog(QWidget):
             lbl.setPixmap(QPixmap(brasao_path).scaled(26, 26, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             hl.addWidget(lbl)
         tl = QLabel("Mapa Base Digital da Cidade de Dourados - MS")
-        tl.setStyleSheet("color:white;font-size:8px;font-weight:bold;")
+        # Mesmo tamanho de fonte do título do painel (fonte padrão do QGIS).
+        self._pt = QApplication.font().pointSizeF()
+        if self._pt <= 0:
+            self._pt = 9.0
+        tl.setStyleSheet(f"color:white;font-size:{self._pt}pt;font-weight:bold;")
+        _f = QFont(QApplication.font())
+        _f.setBold(True)
+        self._larg_titulo = QFontMetrics(_f).horizontalAdvance(tl.text()) + 6
         tl.setWordWrap(False)
         tl.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         hl.addWidget(tl, 1)
@@ -136,8 +143,8 @@ class MapaBaseDialog(QWidget):
         # ── Abas ─────────────────────────────────────────────────────────
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(
-            "QTabBar::tab{padding:4px 9px;font-size:10px;}"
-            "QTabBar::tab:selected{font-weight:bold;color:#1a365d;}")
+            f"QTabBar::tab{{padding:4px 10px;font-size:{self._pt}pt;}}"
+            "QTabBar::tab:selected{color:#1a365d;background:#ffffff;}")
         corpo.addWidget(self.tabs, 1)
 
         def pagina(titulo):
@@ -291,6 +298,8 @@ class MapaBaseDialog(QWidget):
         self.btn_sentido.clicked.connect(self._alternar_sentido)
         linha_ord.addWidget(self.btn_sentido)
         pq.addLayout(linha_ord)
+        for w_ord in (self.lbl_ordenar, self.cb_ordem, self.btn_sentido):
+            w_ord.setVisible(False)  # só aparecem quando há mais de um resultado
         self._ordem_desc = False
 
         l3 = QHBoxLayout()
@@ -622,7 +631,9 @@ class MapaBaseDialog(QWidget):
     def _on_ajustar(self):
         if self._recolhido:
             self._on_recolher()
-        largura = max(self.conteudo.sizeHint().width() + 28, 360)
+        # Cabeçalho em uma linha: título + brasão + 3 botões + margens.
+        minimo_cab = self._larg_titulo + 26 + 3 * 20 + 6 * 4 + 12 + 16 + 14
+        largura = max(self.conteudo.sizeHint().width() + 28, minimo_cab, 360)
         self._definir_largura(largura)
         self._largura_antes = None
         self.btn_maximizar.setText("□")
