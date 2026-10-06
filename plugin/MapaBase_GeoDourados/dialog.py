@@ -4,6 +4,7 @@ from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar,
     QMessageBox, QFrame, QListWidget, QInputDialog, QLineEdit, QScrollArea,
     QWidget, QComboBox, QCheckBox, QListWidgetItem, QAbstractItemView, QApplication,
+    QTabWidget, QStackedWidget, QSizePolicy,
 )
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal, QUrl, QTimer
 from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices
@@ -44,6 +45,9 @@ class MapaBaseDialog(QWidget):
         self._dual = None
         self._camada_tabela = None
         self._timer_tabela = None
+        self._ids_attr = []
+        self._idx_attr = 0
+        self._form = None
         self.dock = None
         self._build_ui()
 
@@ -111,62 +115,111 @@ class MapaBaseDialog(QWidget):
         topo_lay.addWidget(header)
         main.addWidget(self.topo)
 
-        # Status
+        corpo.setContentsMargins(6, 4, 6, 6)
+        corpo.setSpacing(4)
+
+        # ── Abas ─────────────────────────────────────────────────────────
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet(
+            "QTabBar::tab{padding:4px 9px;font-size:10px;}"
+            "QTabBar::tab:selected{font-weight:bold;color:#1a365d;}")
+        corpo.addWidget(self.tabs, 1)
+
+        def pagina(titulo):
+            w = QWidget()
+            lay = QVBoxLayout(w)
+            lay.setContentsMargins(4, 6, 4, 4)
+            lay.setSpacing(5)
+            self.tabs.addTab(w, titulo)
+            return lay
+
+        def titulo_secao(texto):
+            lb = QLabel(texto)
+            lb.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
+            return lb
+
+        def linha_h():
+            f = QFrame()
+            f.setFrameShape(QFrame.HLine)
+            return f
+
+        # ── Aba BASE ─────────────────────────────────────────────────────
+        pb = pagina("Base")
         self.frm_status = QFrame()
-        self.frm_status.setStyleSheet("border:1px solid #ccc;border-radius:4px;padding:4px;")
+        self.frm_status.setStyleSheet("border:1px solid #ccc;border-radius:4px;padding:3px;")
         sl = QHBoxLayout(self.frm_status)
+        sl.setContentsMargins(4, 2, 4, 2)
         self.lbl_status = QLabel("Verificando...")
         self.lbl_status.setStyleSheet("font-size:10px;")
+        self.lbl_status.setWordWrap(True)
         sl.addWidget(self.lbl_status)
-        corpo.addWidget(self.frm_status)
+        pb.addWidget(self.frm_status)
 
-        # Aviso de nova versão do PLUGIN (só aparece quando existe)
         self.frm_plugin = QFrame()
-        self.frm_plugin.setStyleSheet("border:1px solid #e67e22;background:#fef3e2;border-radius:4px;padding:4px;")
+        self.frm_plugin.setStyleSheet("border:1px solid #e67e22;background:#fef3e2;border-radius:4px;padding:3px;")
         pl = QVBoxLayout(self.frm_plugin)
+        pl.setContentsMargins(4, 2, 4, 2)
         self.lbl_plugin = QLabel("")
         self.lbl_plugin.setWordWrap(True)
         self.lbl_plugin.setStyleSheet("font-size:10px;border:none;background:transparent;")
         pl.addWidget(self.lbl_plugin)
         self.btn_atualizar_plugin = QPushButton("⬆  Atualizar plugin")
-        self.btn_atualizar_plugin.setFixedHeight(25)
+        self.btn_atualizar_plugin.setFixedHeight(24)
         self.btn_atualizar_plugin.clicked.connect(self._on_atualizar_plugin)
         pl.addWidget(self.btn_atualizar_plugin)
         self.frm_plugin.setVisible(False)
-        corpo.addWidget(self.frm_plugin)
+        pb.addWidget(self.frm_plugin)
 
         self.prog_bar = QProgressBar()
         self.prog_bar.setVisible(False)
         self.prog_bar.setFixedHeight(14)
-        corpo.addWidget(self.prog_bar)
+        pb.addWidget(self.prog_bar)
         self.lbl_prog = QLabel("")
         self.lbl_prog.setAlignment(Qt.AlignCenter)
         self.lbl_prog.setStyleSheet("font-size:9px;color:#555;")
-        corpo.addWidget(self.lbl_prog)
+        pb.addWidget(self.lbl_prog)
 
         self.btn_atualizar = QPushButton("⬇  Baixar / Atualizar base")
         self.btn_atualizar.setFixedHeight(27)
         self.btn_atualizar.setStyleSheet(
             "QPushButton{background:#1a365d;color:white;border-radius:4px;font-weight:bold;}"
-            "QPushButton:hover{background:#2c5f8a;}QPushButton:disabled{background:#aaa;}"
-        )
+            "QPushButton:hover{background:#2c5f8a;}QPushButton:disabled{background:#aaa;}")
         self.btn_atualizar.clicked.connect(self._on_atualizar)
-        corpo.addWidget(self.btn_atualizar)
-
+        pb.addWidget(self.btn_atualizar)
         self.btn_abrir_oficial = QPushButton("📂  Abrir projeto oficial")
         self.btn_abrir_oficial.setFixedHeight(25)
         self.btn_abrir_oficial.clicked.connect(self._on_abrir_oficial)
-        corpo.addWidget(self.btn_abrir_oficial)
+        pb.addWidget(self.btn_abrir_oficial)
 
-        # Busca
-        linha_busca = QFrame()
-        linha_busca.setFrameShape(QFrame.HLine)
-        corpo.addWidget(linha_busca)
+        pb.addWidget(linha_h())
+        pb.addWidget(titulo_secao("Meus projetos personalizados"))
+        lbl_pers_info = QLabel("Mudou estilos ou adicionou camadas? Salve com um nome: fica separado da "
+                               "base oficial e atualizar a base não sobrescreve.")
+        lbl_pers_info.setWordWrap(True)
+        lbl_pers_info.setStyleSheet("font-size:9px;color:#666;")
+        pb.addWidget(lbl_pers_info)
+        self.lista_pers = QListWidget()
+        self.lista_pers.setFixedHeight(70)
+        self.lista_pers.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        pb.addWidget(self.lista_pers)
+        linha_botoes = QHBoxLayout()
+        self.btn_salvar_pers = QPushButton("💾  Salvar como novo")
+        self.btn_salvar_pers.setFixedHeight(24)
+        self.btn_salvar_pers.clicked.connect(self._on_salvar_personalizado)
+        linha_botoes.addWidget(self.btn_salvar_pers)
+        self.btn_abrir_pers = QPushButton("📂  Abrir")
+        self.btn_abrir_pers.setFixedHeight(24)
+        self.btn_abrir_pers.clicked.connect(self._on_abrir_personalizado)
+        linha_botoes.addWidget(self.btn_abrir_pers)
+        self.btn_excluir_pers = QPushButton("🗑  Excluir")
+        self.btn_excluir_pers.setFixedHeight(24)
+        self.btn_excluir_pers.clicked.connect(self._on_excluir_personalizado)
+        linha_botoes.addWidget(self.btn_excluir_pers)
+        pb.addLayout(linha_botoes)
+        pb.addStretch()
 
-        lbl_busca = QLabel("Buscar no mapa")
-        lbl_busca.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
-        corpo.addWidget(lbl_busca)
-
+        # ── Aba BUSCAR ───────────────────────────────────────────────────
+        pq = pagina("Buscar")
         from .busca import TIPOS
         l1 = QHBoxLayout()
         l1.setSpacing(3)
@@ -178,12 +231,12 @@ class MapaBaseDialog(QWidget):
         for rotulo, chave in TIPOS:
             self.cb_tipo.addItem(rotulo, chave)
         self.cb_tipo.setToolTip(
-            "Inscrição e Matrícula: procuram nos lotes (por prefixo; com 'Exata', o valor completo).\n"
+            "Inscrição e Matrícula: procuram nos lotes (por prefixo; com 'Exata', o valor completo). "
             "Loteamento e Logradouro: pelo nome, em qualquer ordem e sem acento; dão zoom e piscam o contorno.")
         l1.addWidget(self.cb_tipo, 1)
         self.chk_exata = QCheckBox("Exata")
         l1.addWidget(self.chk_exata)
-        corpo.addLayout(l1)
+        pq.addLayout(l1)
 
         l2 = QHBoxLayout()
         l2.setSpacing(3)
@@ -202,12 +255,12 @@ class MapaBaseDialog(QWidget):
         b_sel.setToolTip("Mostra o lote que está selecionado no mapa.")
         b_sel.clicked.connect(self._on_lote_selecionado)
         l2.addWidget(b_sel)
-        corpo.addLayout(l2)
+        pq.addLayout(l2)
 
         self.lbl_busca = QLabel("")
         self.lbl_busca.setWordWrap(True)
         self.lbl_busca.setStyleSheet("font-size:9px;color:#555;")
-        corpo.addWidget(self.lbl_busca)
+        pq.addWidget(self.lbl_busca)
 
         l3 = QHBoxLayout()
         l3.setSpacing(2)
@@ -216,6 +269,7 @@ class MapaBaseDialog(QWidget):
         self.lista_busca.itemClicked.connect(self._on_resultado_clicado)
         self.lista_busca.itemActivated.connect(self._on_resultado_clicado)
         self.lista_busca.setFixedHeight(60)
+        self.lista_busca.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         l3.addWidget(self.lista_busca, 1)
         col = QVBoxLayout()
         col.setSpacing(2)
@@ -229,121 +283,96 @@ class MapaBaseDialog(QWidget):
         b_alt.setFixedSize(24, 22)
         b_alt.clicked.connect(self._ajustar_altura_lista)
         col.addWidget(b_alt)
-        col.addStretch()
         l3.addLayout(col)
-        corpo.addLayout(l3)
+        l3.setAlignment(Qt.AlignTop)
+        pq.addLayout(l3)
 
-        self.btn_tabela = QPushButton("📋  Tabela de atributos")
-        self.btn_tabela.setFixedHeight(25)
-        self.btn_tabela.setToolTip("Mostra, aqui no painel, a tabela de atributos das feições selecionadas "
-                                   "(da camada ativa, ou dos lotes se nenhuma estiver ativa).")
-        self.btn_tabela.clicked.connect(self._on_tabela_atributos)
-        corpo.addWidget(self.btn_tabela)
+        b_ver = QPushButton("📋  Ver atributos do selecionado  →")
+        b_ver.setFixedHeight(25)
+        b_ver.setToolTip("Abre a aba Atributos com as feições selecionadas.")
+        b_ver.clicked.connect(self._ir_para_atributos)
+        pq.addWidget(b_ver)
 
-        # Tabela de atributos embutida no painel
-        self.frm_tabela = QFrame()
-        self.frm_tabela.setStyleSheet("QFrame#frmTabela{border:1px solid #cbd5e0;border-radius:4px;}")
-        self.frm_tabela.setObjectName("frmTabela")
-        self.lay_tabela = QVBoxLayout(self.frm_tabela)
-        self.lay_tabela.setContentsMargins(4, 4, 4, 4)
-        self.lay_tabela.setSpacing(3)
-        topo_t = QHBoxLayout()
-        self.lbl_tabela = QLabel("")
-        self.lbl_tabela.setStyleSheet("font-size:9px;font-weight:bold;color:#1a365d;")
-        self.lbl_tabela.setWordWrap(True)
-        topo_t.addWidget(self.lbl_tabela, 1)
-        self.chk_so_selecionados = QCheckBox("Só selecionados")
-        self.chk_so_selecionados.setChecked(True)
-        self.chk_so_selecionados.setStyleSheet("font-size:9px;")
-        self.chk_so_selecionados.toggled.connect(lambda _=None: self._atualizar_tabela())
-        topo_t.addWidget(self.chk_so_selecionados)
-        b_janela = QPushButton("↗")
-        b_janela.setToolTip("Abrir a tabela completa numa janela separada do QGIS.")
-        b_janela.setFixedSize(22, 20)
-        b_janela.clicked.connect(self._on_tabela_em_janela)
-        topo_t.addWidget(b_janela)
-        b_fechar_t = QPushButton("✕")
-        b_fechar_t.setToolTip("Fechar a tabela.")
-        b_fechar_t.setFixedSize(22, 20)
-        b_fechar_t.clicked.connect(self._on_fechar_tabela)
-        topo_t.addWidget(b_fechar_t)
-        self.lay_tabela.addLayout(topo_t)
-        self.frm_tabela.setVisible(False)
-        corpo.addWidget(self.frm_tabela)
-
-        # Croqui (PDF)
-        linha_croqui = QFrame()
-        linha_croqui.setFrameShape(QFrame.HLine)
-        corpo.addWidget(linha_croqui)
-
-        lbl_croqui = QLabel("Croqui de localização (PDF)")
-        lbl_croqui.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
-        corpo.addWidget(lbl_croqui)
-
-        lbl_croqui_info = QLabel("Selecione 1 lote no mapa do projeto oficial e clique:")
+        pq.addWidget(linha_h())
+        pq.addWidget(titulo_secao("Croqui de localização (PDF)"))
+        lbl_croqui_info = QLabel("Selecione 1 lote (pela busca ou no mapa) e clique:")
         lbl_croqui_info.setStyleSheet("font-size:9px;color:#666;")
-        corpo.addWidget(lbl_croqui_info)
-
+        pq.addWidget(lbl_croqui_info)
         linha_croqui_botoes = QHBoxLayout()
-        self.btn_croqui_1000 = QPushButton("🗺  Croqui 1:1000")
+        self.btn_croqui_1000 = QPushButton("🗺  1:1000")
         self.btn_croqui_1000.setFixedHeight(25)
         self.btn_croqui_1000.clicked.connect(lambda: self._on_gerar_croqui(1000))
         linha_croqui_botoes.addWidget(self.btn_croqui_1000)
-
-        self.btn_croqui_tela = QPushButton("🗺  Croqui (escala da tela)")
+        self.btn_croqui_tela = QPushButton("🗺  Escala da tela")
         self.btn_croqui_tela.setFixedHeight(25)
         self.btn_croqui_tela.clicked.connect(lambda: self._on_gerar_croqui(None))
         linha_croqui_botoes.addWidget(self.btn_croqui_tela)
-        corpo.addLayout(linha_croqui_botoes)
+        pq.addLayout(linha_croqui_botoes)
+        pq.addStretch()
 
-        # Projeto personalizado
-        linha = QFrame()
-        linha.setFrameShape(QFrame.HLine)
-        corpo.addWidget(linha)
+        # ── Aba ATRIBUTOS ────────────────────────────────────────────────
+        pa = pagina("Atributos")
+        self.lbl_attr = QLabel("")
+        self.lbl_attr.setStyleSheet("font-size:10px;font-weight:bold;color:#1a365d;")
+        self.lbl_attr.setWordWrap(True)
+        pa.addWidget(self.lbl_attr)
+        nav = QHBoxLayout()
+        nav.setSpacing(3)
+        self.btn_prev = QPushButton("◀")
+        self.btn_prev.setFixedSize(26, 22)
+        self.btn_prev.clicked.connect(lambda: self._navegar_attr(-1))
+        nav.addWidget(self.btn_prev)
+        self.lbl_pos = QLabel("")
+        self.lbl_pos.setStyleSheet("font-size:9px;")
+        self.lbl_pos.setAlignment(Qt.AlignCenter)
+        nav.addWidget(self.lbl_pos, 1)
+        self.btn_next = QPushButton("▶")
+        self.btn_next.setFixedSize(26, 22)
+        self.btn_next.clicked.connect(lambda: self._navegar_attr(1))
+        nav.addWidget(self.btn_next)
+        self.cb_modo_attr = QComboBox()
+        self.cb_modo_attr.addItems(["Formulário", "Tabela"])
+        self.cb_modo_attr.setToolTip("Formulário: um registro por vez (campo e valor). Tabela: vários registros em linhas.")
+        self.cb_modo_attr.currentIndexChanged.connect(lambda _=None: self._atualizar_atributos())
+        nav.addWidget(self.cb_modo_attr)
+        self.chk_so_selecionados = QCheckBox("Só selec.")
+        self.chk_so_selecionados.setChecked(True)
+        self.chk_so_selecionados.setStyleSheet("font-size:9px;")
+        self.chk_so_selecionados.setToolTip("No modo Tabela: só as feições selecionadas ou a camada toda.")
+        self.chk_so_selecionados.toggled.connect(lambda _=None: self._atualizar_atributos())
+        nav.addWidget(self.chk_so_selecionados)
+        b_janela = QPushButton("↗")
+        b_janela.setToolTip("Abrir a tabela completa numa janela separada do QGIS.")
+        b_janela.setFixedSize(24, 22)
+        b_janela.clicked.connect(self._on_tabela_em_janela)
+        nav.addWidget(b_janela)
+        pa.addLayout(nav)
+        self.stack_attr = QStackedWidget()
+        # página 0: formulário
+        self.scroll_form = QScrollArea()
+        self.scroll_form.setWidgetResizable(True)
+        self.scroll_form.setFrameShape(QFrame.NoFrame)
+        self.cont_form = QWidget()
+        self.lay_form = QVBoxLayout(self.cont_form)
+        self.lay_form.setContentsMargins(0, 0, 0, 0)
+        self.scroll_form.setWidget(self.cont_form)
+        self.stack_attr.addWidget(self.scroll_form)
+        # página 1: tabela
+        self.cont_tabela = QWidget()
+        self.lay_tabela = QVBoxLayout(self.cont_tabela)
+        self.lay_tabela.setContentsMargins(0, 0, 0, 0)
+        self.stack_attr.addWidget(self.cont_tabela)
+        self.stack_attr.setMinimumHeight(300)
+        pa.addWidget(self.stack_attr, 1)
+        self.tabs.currentChanged.connect(self._on_aba_mudou)
+        try:
+            self.iface.currentLayerChanged.connect(self._on_camada_ativa_mudou)
+        except Exception:
+            pass
 
-        lbl_pers = QLabel("Meus projetos personalizados")
-        lbl_pers.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
-        corpo.addWidget(lbl_pers)
-
-        lbl_pers_info = QLabel(
-            "Adicionou camadas ou mudou estilos? Salve com um nome — fica separado "
-            "da base oficial, então atualizar a base não sobrescreve suas mudanças. "
-            "Pode salvar quantos quiser."
-        )
-        lbl_pers_info.setWordWrap(True)
-        lbl_pers_info.setStyleSheet("font-size:9px;color:#666;")
-        corpo.addWidget(lbl_pers_info)
-
-        self.lista_pers = QListWidget()
-        self.lista_pers.setFixedHeight(80)
-        corpo.addWidget(self.lista_pers)
-
-        linha_botoes = QHBoxLayout()
-        self.btn_salvar_pers = QPushButton("💾  Salvar como novo")
-        self.btn_salvar_pers.setFixedHeight(25)
-        self.btn_salvar_pers.clicked.connect(self._on_salvar_personalizado)
-        linha_botoes.addWidget(self.btn_salvar_pers)
-
-        self.btn_abrir_pers = QPushButton("📂  Abrir selecionado")
-        self.btn_abrir_pers.setFixedHeight(25)
-        self.btn_abrir_pers.clicked.connect(self._on_abrir_personalizado)
-        linha_botoes.addWidget(self.btn_abrir_pers)
-        corpo.addLayout(linha_botoes)
-
-        self.btn_excluir_pers = QPushButton("🗑  Excluir selecionado")
-        self.btn_excluir_pers.setFixedHeight(22)
-        self.btn_excluir_pers.clicked.connect(self._on_excluir_personalizado)
-        corpo.addWidget(self.btn_excluir_pers)
-
-        # Links úteis
-        linha_links = QFrame()
-        linha_links.setFrameShape(QFrame.HLine)
-        corpo.addWidget(linha_links)
-
-        lbl_links = QLabel("Links úteis")
-        lbl_links.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
-        corpo.addWidget(lbl_links)
-
+        # ── Aba MAIS ─────────────────────────────────────────────────────
+        pm = pagina("Mais")
+        pm.addWidget(titulo_secao("Links úteis"))
         LINKS = [
             ("📄  CND (Certidão Negativa)", "https://cac.dourados.ms.gov.br/emissoes/documentos/certidao-negativa/imovel"),
             ("💰  Valor Venal", "https://cac.dourados.ms.gov.br/emissoes/documentos/certidao-venal"),
@@ -354,29 +383,33 @@ class MapaBaseDialog(QWidget):
         linha_links2 = QHBoxLayout()
         for i, (texto, url) in enumerate(LINKS):
             btn = QPushButton(texto)
-            btn.setFixedHeight(24)
+            btn.setFixedHeight(26)
             btn.setStyleSheet("font-size:9px;")
             btn.clicked.connect(lambda _checked, u=url: QDesktopServices.openUrl(QUrl(u)))
             (linha_links1 if i < 2 else linha_links2).addWidget(btn)
-        corpo.addLayout(linha_links1)
-        corpo.addLayout(linha_links2)
-
+        pm.addLayout(linha_links1)
+        pm.addLayout(linha_links2)
+        pm.addWidget(linha_h())
         btn_sobre = QPushButton("ℹ  Sobre os dados e termos de uso")
-        btn_sobre.setFixedHeight(24)
-        btn_sobre.setStyleSheet("font-size:9px;")
+        btn_sobre.setFixedHeight(26)
         btn_sobre.clicked.connect(self._on_sobre_dados)
-        corpo.addWidget(btn_sobre)
+        pm.addWidget(btn_sobre)
+        pm.addStretch()
 
+        # ── Rodapé fixo (aviso legal) ────────────────────────────────────
         from .avisos import AVISO_CURTO
+        rod = QHBoxLayout()
+        rod.setSpacing(4)
         lbl_aviso = QLabel(AVISO_CURTO)
         lbl_aviso.setWordWrap(True)
-        lbl_aviso.setStyleSheet("font-size:10px;color:#2d3748;")
-        corpo.addWidget(lbl_aviso)
-
-        btn_fechar = QPushButton("Fechar")
-        btn_fechar.setFixedHeight(24)
-        btn_fechar.clicked.connect(self._on_fechar_painel)
-        corpo.addWidget(btn_fechar)
+        lbl_aviso.setStyleSheet("font-size:9px;color:#2d3748;")
+        rod.addWidget(lbl_aviso, 1)
+        b_info = QPushButton("ℹ")
+        b_info.setToolTip("Sobre os dados e termos de uso")
+        b_info.setFixedSize(24, 24)
+        b_info.clicked.connect(self._on_sobre_dados)
+        rod.addWidget(b_info)
+        corpo.addLayout(rod)
 
         self.scroll.setWidget(self.conteudo)
         main.addWidget(self.scroll, 1)
@@ -634,6 +667,9 @@ class MapaBaseDialog(QWidget):
         self._mostrar_resultados([item], "Lote selecionado no mapa.")
         busca.zoom_itens(self.iface, [item], piscar=False)
 
+    # ── Aba Atributos (formulário / tabela) ──────────────────────────────
+    LIMITE_FORM = 300
+
     def _camada_da_tabela(self):
         from qgis.core import QgsProject
         from .camadas import camadas_principais
@@ -642,79 +678,143 @@ class MapaBaseDialog(QWidget):
             camada = camadas_principais(QgsProject.instance())["lotes"]
         return camada
 
-    def _on_tabela_atributos(self):
+    def _ir_para_atributos(self):
+        self.tabs.setCurrentIndex(self.tabs.count() - 2)  # aba Atributos (penúltima)
+
+    def _indice_aba_atributos(self):
+        return self.tabs.count() - 2
+
+    def _on_aba_mudou(self, indice):
+        if indice == self._indice_aba_atributos():
+            self._carregar_atributos()
+
+    def _on_camada_ativa_mudou(self, *args):
+        if self.tabs.currentIndex() == self._indice_aba_atributos():
+            self._carregar_atributos()
+
+    def _carregar_atributos(self):
         camada = self._camada_da_tabela()
-        if camada is None:
-            QMessageBox.warning(self, "Sem camada", "Abra o projeto oficial (ou selecione uma camada vetorial) primeiro.")
-            return
-        self._trocar_camada_tabela(camada)
-        self.frm_tabela.setVisible(True)
-        self._atualizar_tabela()
+        if camada is not self._camada_tabela:
+            if self._camada_tabela is not None:
+                try:
+                    self._camada_tabela.selectionChanged.disconnect(self._agendar_atributos)
+                except Exception:
+                    pass
+            self._camada_tabela = camada
+            self._idx_attr = 0
+            if camada is not None:
+                camada.selectionChanged.connect(self._agendar_atributos)
+        self._atualizar_atributos()
 
-    def _trocar_camada_tabela(self, camada):
-        # Acompanha a seleção da camada mostrada (com pequeno atraso, p/ não recarregar a cada clique).
-        if self._camada_tabela is not None:
-            try:
-                self._camada_tabela.selectionChanged.disconnect(self._agendar_tabela)
-            except Exception:
-                pass
-        self._camada_tabela = camada
-        camada.selectionChanged.connect(self._agendar_tabela)
-
-    def _agendar_tabela(self, *args):
-        if not self.frm_tabela.isVisible():
+    def _agendar_atributos(self, *args):
+        if self.tabs.currentIndex() != self._indice_aba_atributos():
             return
         if self._timer_tabela is None:
             self._timer_tabela = QTimer(self)
             self._timer_tabela.setSingleShot(True)
-            self._timer_tabela.timeout.connect(self._atualizar_tabela)
+            self._timer_tabela.timeout.connect(self._atualizar_atributos)
         self._timer_tabela.start(250)
 
-    def _atualizar_tabela(self):
+    def _limpar_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.hide()
+                w.deleteLater()
+        self._form = None
+        self._dual = None
+
+    def _navegar_attr(self, passo):
+        if not self._ids_attr:
+            return
+        self._idx_attr = (self._idx_attr + passo) % len(self._ids_attr)
+        self._mostrar_formulario()
+
+    def _atualizar_atributos(self):
+        camada = self._camada_tabela
+        self._limpar_layout(self.lay_form)
+        self._limpar_layout(self.lay_tabela)
+        if camada is None:
+            self.lbl_attr.setText("Abra o projeto oficial (ou selecione uma camada vetorial) primeiro.")
+            self.lbl_pos.setText("")
+            self.btn_prev.setEnabled(False)
+            self.btn_next.setEnabled(False)
+            return
+        self._ids_attr = list(camada.selectedFeatureIds())
+        n = len(self._ids_attr)
+        modo_tabela = self.cb_modo_attr.currentIndex() == 1
+        self.chk_so_selecionados.setVisible(modo_tabela)
+        self.btn_prev.setVisible(not modo_tabela)
+        self.btn_next.setVisible(not modo_tabela)
+        self.lbl_pos.setVisible(not modo_tabela)
+        if modo_tabela:
+            self._mostrar_tabela()
+        else:
+            self.lbl_attr.setText(f"{camada.name()} — {n} selecionado(s)")
+            self._mostrar_formulario()
+
+    def _mostrar_formulario(self):
+        from qgis.gui import QgsAttributeForm, QgsAttributeEditorContext
+        camada = self._camada_tabela
+        self.stack_attr.setCurrentIndex(0)
+        self._limpar_layout(self.lay_form)
+        ids = self._ids_attr[: self.LIMITE_FORM]
+        n = len(ids)
+        self.btn_prev.setEnabled(n > 1)
+        self.btn_next.setEnabled(n > 1)
+        if not ids:
+            self.lbl_pos.setText("")
+            msg = QLabel("Nenhuma feição selecionada.\nSelecione no mapa ou use a aba Buscar.")
+            msg.setStyleSheet("color:#718096;padding:12px;")
+            msg.setAlignment(Qt.AlignCenter)
+            self.lay_form.addWidget(msg)
+            self.lay_form.addStretch()
+            return
+        self._idx_attr = min(self._idx_attr, n - 1)
+        feat = camada.getFeature(ids[self._idx_attr])
+        try:
+            from qgis.core import QgsVectorLayerUtils
+            titulo = QgsVectorLayerUtils.getFeatureDisplayString(camada, feat)
+        except Exception:
+            titulo = ""
+        self.lbl_pos.setText(f"{self._idx_attr + 1} / {n}   {titulo}")
+        form = QgsAttributeForm(camada, feat, QgsAttributeEditorContext(), self.cont_form)
+        form.setMode(QgsAttributeEditorContext.IdentifyMode)
+        self.lay_form.addWidget(form)
+        self._form = form
+
+    def _mostrar_tabela(self):
         from qgis.core import QgsFeatureRequest
         from qgis.gui import QgsDualView, QgsAttributeEditorContext
         camada = self._camada_tabela
-        if camada is None:
-            return
+        self.stack_attr.setCurrentIndex(1)
         so_sel = self.chk_so_selecionados.isChecked()
         req = QgsFeatureRequest()
         if so_sel:
             ids = list(camada.selectedFeatureIds())
             req.setFilterFids(ids)
-            self.lbl_tabela.setText(f"{camada.name()} — {len(ids)} selecionado(s)")
+            self.lbl_attr.setText(f"{camada.name()} — {len(ids)} selecionado(s)")
+            if not ids:
+                self.lbl_attr.setText(f"{camada.name()} — nenhuma feição selecionada (selecione no mapa ou use a busca)")
+                return
         else:
             limite = 5000
             req.setLimit(limite)
             total = camada.featureCount()
             extra = f" (mostrando os {limite} primeiros)" if total > limite else ""
-            self.lbl_tabela.setText(f"{camada.name()} — {total} feição(ões){extra}")
-        if self._dual is not None:
-            self.lay_tabela.removeWidget(self._dual)
-            self._dual.hide()
-            self._dual.deleteLater()
-            self._dual = None
-        if so_sel and not ids:
-            self.lbl_tabela.setText(f"{camada.name()} — nenhuma feição selecionada (selecione no mapa ou use a busca)")
-            return
-        dv = QgsDualView(self.frm_tabela)
+            self.lbl_attr.setText(f"{camada.name()} — {total} feição(ões){extra}")
+        dv = QgsDualView(self.cont_tabela)
         dv.init(camada, self.iface.mapCanvas(), req, QgsAttributeEditorContext())
         dv.setView(QgsDualView.AttributeTable)
-        linhas = len(ids) if so_sel else 10
-        dv.setMinimumHeight(min(220, 64 + 24 * max(linhas, 1)))
         self.lay_tabela.addWidget(dv, 1)
         self._dual = dv
 
     def _on_tabela_em_janela(self):
+        if self._camada_tabela is None:
+            self._carregar_atributos()
         if self._camada_tabela is not None:
             self.iface.showAttributeTable(self._camada_tabela)
-
-    def _on_fechar_tabela(self):
-        self.frm_tabela.setVisible(False)
-        if self._dual is not None:
-            self.lay_tabela.removeWidget(self._dual)
-            self._dual.hide()
-            self._dual.deleteLater()
-            self._dual = None
 
     # ── Croqui ───────────────────────────────────────────────────────────
     def _on_gerar_croqui(self, escala_fixa):
