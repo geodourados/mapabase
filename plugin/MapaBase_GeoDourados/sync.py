@@ -16,6 +16,9 @@ PASTA_MEUS_PROJETOS = "MeusProjetos"
 DEFAULT_DIR = r"C:\GeoDourados-Offline"
 
 URL_GPKG = "https://github.com/geodourados/mapabase/releases/download/latest/Mapa_GeoDourados.gpkg"
+URL_PLUGIN_ZIP = "https://github.com/geodourados/mapabase/releases/download/latest/MapaBase_GeoDourados_plugin.zip"
+URL_METADATA_REMOTO = "https://raw.githubusercontent.com/geodourados/mapabase/main/plugin/MapaBase_GeoDourados/metadata.txt"
+PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 URL_API_RELEASE = "https://api.github.com/repos/geodourados/mapabase/releases/tags/latest"
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GeoDouradosPlugin/2.0"}
@@ -208,3 +211,84 @@ def detectar_qgis_exe():
                 return p
 
     return None
+
+
+# ── Atualização do próprio plugin ────────────────────────────────────────────
+def _ler_versao(texto):
+    m = re.search(r"^version\s*=\s*([0-9][0-9.]*)", texto, re.MULTILINE)
+    return m.group(1) if m else None
+
+
+def _tupla_versao(v):
+    return tuple(int(p) for p in v.split(".") if p.isdigit())
+
+
+def versao_plugin_local():
+    try:
+        with open(os.path.join(PLUGIN_DIR, "metadata.txt"), encoding="utf-8") as f:
+            return _ler_versao(f.read())
+    except Exception:
+        return None
+
+
+def verificar_atualizacao_plugin():
+    """Retorna (tem_atualizacao: bool, versao_remota: str|None, versao_local: str|None).
+    Lê o metadata.txt publicado no GitHub (sem limite de consultas, ao
+    contrário da API). Sem conexão/erro -> (False, None, local)."""
+    local = versao_plugin_local()
+    try:
+        req = urllib.request.Request(URL_METADATA_REMOTO, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=10) as r:
+            remota = _ler_versao(r.read().decode("utf-8", errors="replace"))
+        if remota and local and _tupla_versao(remota) > _tupla_versao(local):
+            return True, remota, local
+        return False, remota, local
+    except Exception:
+        return False, None, local
+
+
+def atualizar_plugin():
+    """Baixa o zip publicado e sobrescreve os arquivos deste plugin.
+    Só aplica se a versão DENTRO do zip for mais nova que a instalada (o
+    metadata no git pode estar à frente do zip por alguns minutos).
+    Retorna (ok: bool, mensagem: str); requer reiniciar o QGIS pra valer."""
+    import io
+    import zipfile
+
+    try:
+        req = urllib.request.Request(URL_PLUGIN_ZIP, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=60) as r:
+            dados = r.read()
+        zf = zipfile.ZipFile(io.BytesIO(dados))
+    except Exception as e:
+        return False, f"Não foi possível baixar a atualização: {e}"
+
+    prefixo = "MapaBase_GeoDourados/"
+    base = os.path.normcase(PLUGIN_DIR) + os.sep
+    arquivos = {}
+    for nome in zf.namelist():
+        if not nome.startswith(prefixo) or nome.endswith("/"):
+            continue
+        destino = os.path.normpath(os.path.join(PLUGIN_DIR, nome[len(prefixo):]))
+        if not os.path.normcase(destino).startswith(base):  # bloqueia ../ no zip
+            return False, "Pacote de atualização inválido."
+        arquivos[destino] = zf.read(nome)
+
+    meta = arquivos.get(os.path.join(PLUGIN_DIR, "metadata.txt"))
+    if meta is None or os.path.join(PLUGIN_DIR, "__init__.py") not in arquivos:
+        return False, "Pacote de atualização incompleto."
+    nova = _ler_versao(meta.decode("utf-8", errors="replace"))
+    local = versao_plugin_local()
+    if not nova or (local and _tupla_versao(nova) <= _tupla_versao(local)):
+        return False, "O pacote publicado ainda não tem versão mais nova — tente de novo em alguns minutos."
+
+    try:
+        for destino, conteudo in arquivos.items():
+            os.makedirs(os.path.dirname(destino), exist_ok=True)
+            tmp = destino + ".novo"
+            with open(tmp, "wb") as f:
+                f.write(conteudo)
+            os.replace(tmp, destino)
+    except Exception as e:
+        return False, f"Falha ao gravar a atualização: {e}"
+    return True, nova

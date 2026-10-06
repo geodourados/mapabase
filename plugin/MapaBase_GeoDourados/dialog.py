@@ -76,6 +76,21 @@ class MapaBaseDialog(QDialog):
         sl.addWidget(self.lbl_status)
         corpo.addWidget(self.frm_status)
 
+        # Aviso de nova versão do PLUGIN (só aparece quando existe)
+        self.frm_plugin = QFrame()
+        self.frm_plugin.setStyleSheet("border:1px solid #e67e22;background:#fef3e2;border-radius:4px;padding:4px;")
+        pl = QVBoxLayout(self.frm_plugin)
+        self.lbl_plugin = QLabel("")
+        self.lbl_plugin.setWordWrap(True)
+        self.lbl_plugin.setStyleSheet("font-size:10px;border:none;background:transparent;")
+        pl.addWidget(self.lbl_plugin)
+        self.btn_atualizar_plugin = QPushButton("⬆  Atualizar plugin")
+        self.btn_atualizar_plugin.setFixedHeight(25)
+        self.btn_atualizar_plugin.clicked.connect(self._on_atualizar_plugin)
+        pl.addWidget(self.btn_atualizar_plugin)
+        self.frm_plugin.setVisible(False)
+        corpo.addWidget(self.frm_plugin)
+
         self.prog_bar = QProgressBar()
         self.prog_bar.setVisible(False)
         self.prog_bar.setFixedHeight(14)
@@ -218,7 +233,31 @@ class MapaBaseDialog(QDialog):
                 self.btn_atualizar.setText("🔄  Verificar / Atualizar")
             self.btn_abrir_oficial.setEnabled(True)
 
+        self._atualizar_aviso_plugin()
         self._atualizar_lista_personalizados()
+
+    def _atualizar_aviso_plugin(self):
+        from .sync import verificar_atualizacao_plugin
+        tem, remota, local = verificar_atualizacao_plugin()
+        self.frm_plugin.setVisible(tem)
+        if tem:
+            self.lbl_plugin.setText(f"🔔 Nova versão do plugin disponível: {remota} (instalada: {local}).")
+
+    def _on_atualizar_plugin(self):
+        from qgis.PyQt.QtWidgets import QApplication
+        from .sync import atualizar_plugin
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            ok, info = atualizar_plugin()
+        finally:
+            QApplication.restoreOverrideCursor()
+        if ok:
+            self.btn_atualizar_plugin.setEnabled(False)
+            QMessageBox.information(
+                self, "Plugin atualizado",
+                f"Plugin atualizado para a versão {info}.\n\nFeche e abra o QGIS novamente para começar a usar a nova versão.")
+        else:
+            QMessageBox.warning(self, "Não foi possível atualizar", info)
 
     def _atualizar_lista_personalizados(self):
         from .sync import listar_meus_projetos

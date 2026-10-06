@@ -1,5 +1,6 @@
 import os
 
+from qgis.core import Qgis
 from qgis.PyQt.QtCore import QSize, Qt, QThread, pyqtSignal
 from qgis.PyQt.QtGui import QColor, QIcon, QPainter, QPixmap
 from qgis.PyQt.QtWidgets import QAction, QToolBar
@@ -8,12 +9,13 @@ PLUGIN_DIR = os.path.dirname(__file__)
 
 
 class CheckUpdateWorker(QThread):
-    resultado = pyqtSignal(bool, str)
+    resultado = pyqtSignal(bool, bool, str)
 
     def run(self):
-        from .sync import verificar_atualizacao_disponivel
-        tem, msg = verificar_atualizacao_disponivel()
-        self.resultado.emit(tem, msg)
+        from .sync import verificar_atualizacao_disponivel, verificar_atualizacao_plugin
+        base, _msg = verificar_atualizacao_disponivel()
+        plugin, versao_nova, _local = verificar_atualizacao_plugin()
+        self.resultado.emit(base, plugin, versao_nova or "")
 
 
 class MapaBaseGeoDouradosPlugin:
@@ -24,6 +26,8 @@ class MapaBaseGeoDouradosPlugin:
         self._check_worker = None
         self._icon_normal = None
         self._icon_com_aviso = None
+        self._avisou_plugin = False
+        self._avisou_base = False
 
     def initGui(self):
         self._icon_normal = QIcon(os.path.join(PLUGIN_DIR, "icons", "icon.png"))
@@ -85,12 +89,34 @@ class MapaBaseGeoDouradosPlugin:
         self._check_worker.resultado.connect(self._on_resultado_checagem)
         self._check_worker.start()
 
-    def _on_resultado_checagem(self, tem_atualizacao, _msg):
+    def _on_resultado_checagem(self, base_nova, plugin_novo, versao_plugin):
         if not self.action:
             return
-        self.action.setIcon(self._icon_com_aviso if tem_atualizacao else self._icon_normal)
+        tem = base_nova or plugin_novo
+        self.action.setIcon(self._icon_com_aviso if tem else self._icon_normal)
+
+        partes = []
+        if plugin_novo:
+            partes.append(f"nova versão do plugin ({versao_plugin})")
+        if base_nova:
+            partes.append("nova base de dados")
         self.action.setToolTip(
-            "Mapa Base - GeoDourados — atualização disponível!"
-            if tem_atualizacao
+            "Mapa Base - GeoDourados — " + " e ".join(partes) + " disponível!"
+            if tem
             else "Mapa Base Digital da Cidade de Dourados - MS"
         )
+
+        # Aviso visível na barra de mensagens do QGIS, uma vez por sessão por
+        # tipo de novidade (o ponto vermelho sozinho passa despercebido).
+        if plugin_novo and not self._avisou_plugin:
+            self._avisou_plugin = True
+            self.iface.messageBar().pushMessage(
+                "Mapa Base - GeoDourados",
+                f"Nova versão do plugin disponível ({versao_plugin}). Abra o plugin e clique em \"Atualizar plugin\".",
+                level=Qgis.Warning, duration=15)
+        elif base_nova and not self._avisou_base:
+            self._avisou_base = True
+            self.iface.messageBar().pushMessage(
+                "Mapa Base - GeoDourados",
+                "Há uma nova base de dados publicada. Abra o plugin para atualizar.",
+                level=Qgis.Info, duration=10)
