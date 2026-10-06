@@ -632,7 +632,7 @@ class MapaBaseDialog(QWidget):
         if self._recolhido:
             self._on_recolher()
         # Cabeçalho em uma linha: título + brasão + 3 botões + margens.
-        minimo_cab = self._larg_titulo + 26 + 3 * 20 + 6 * 4 + 12 + 16 + 14
+        minimo_cab = self._larg_titulo + 26 + 3 * 20 + 4 * 4 + 12 + 16 + 2
         largura = max(self.conteudo.sizeHint().width() + 28, minimo_cab, 360)
         self._definir_largura(largura)
         self._largura_antes = None
