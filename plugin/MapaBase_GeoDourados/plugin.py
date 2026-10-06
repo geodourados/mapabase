@@ -50,7 +50,7 @@ class MapaBaseGeoDouradosPlugin:
         # Painel acoplado à direita (começa escondido; o botão da barra abre).
         from .dialog import MapaBaseDialog
         self.dialog = MapaBaseDialog(self.iface, on_fechar=self._checar_atualizacao_em_segundo_plano)
-        self.dock = QDockWidget("Mapa Base - GeoDourados", self.iface.mainWindow())
+        self.dock = QDockWidget("Mapa Base - GeoDourados (Offline)", self.iface.mainWindow())
         self.dock.setObjectName("MapaBaseGeoDouradosDock")
         self.dock.setWidget(self.dialog)
         self.dialog.dock = self.dock

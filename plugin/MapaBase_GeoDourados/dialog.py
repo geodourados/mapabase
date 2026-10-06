@@ -26,6 +26,20 @@ class DownloadWorker(QThread):
         self.finished.emit(ok, err)
 
 
+class _Cabecalho(QFrame):
+    """Faixa azul do topo; mantém o rótulo de versão colado no canto inferior direito."""
+
+    def __init__(self):
+        super().__init__()
+        self.canto = None
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.canto is not None:
+            self.canto.adjustSize()
+            self.canto.move(self.width() - self.canto.width() - 5, self.height() - self.canto.height() - 1)
+
+
 class MapaBaseDialog(QWidget):
     LARGURA_RECOLHIDO = 34  # um pouco maior que o botão X do painel
 
@@ -33,7 +47,7 @@ class MapaBaseDialog(QWidget):
         super().__init__()
         self.iface = iface
         self._on_fechar = on_fechar
-        self.setWindowTitle("Mapa Base - GeoDourados")
+        self.setWindowTitle("Mapa Base - GeoDourados (Offline)")
         self.setWindowIcon(QIcon(os.path.join(PLUGIN_DIR, "icons", "icon.png")))
         self.setMinimumWidth(340)
         self._itens_busca = []
@@ -72,29 +86,30 @@ class MapaBaseDialog(QWidget):
         corpo.setContentsMargins(8, 6, 8, 8)
         corpo.setSpacing(5)
 
-        header = QFrame()
+        header = _Cabecalho()
         self._header = header
         header.setStyleSheet("background-color: #1a365d;")
-        header.setFixedHeight(44)
+        header.setFixedHeight(34)
         hl = QHBoxLayout(header)
-        hl.setContentsMargins(10, 4, 10, 4)
+        hl.setContentsMargins(6, 3, 6, 3)
+        hl.setSpacing(4)
         brasao_path = os.path.join(PLUGIN_DIR, "icons", "brasao.png")
         if os.path.exists(brasao_path):
             lbl = QLabel()
-            lbl.setPixmap(QPixmap(brasao_path).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            lbl.setPixmap(QPixmap(brasao_path).scaled(26, 26, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             hl.addWidget(lbl)
         tl = QLabel("Mapa Base Digital da Cidade de Dourados - MS")
-        tl.setStyleSheet("color:white;font-size:9px;font-weight:bold;")
-        tl.setWordWrap(True)
-        hl.addWidget(tl)
-        hl.addStretch()
+        tl.setStyleSheet("color:white;font-size:8px;font-weight:bold;")
+        tl.setWordWrap(False)
+        tl.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        hl.addWidget(tl, 1)
         from .sync import versao_plugin_local
         versao = versao_plugin_local()
         if versao:
-            lbl_versao = QLabel(f"v{versao}")
-            lbl_versao.setStyleSheet("color:#cbd5e0;font-size:9px;")
+            lbl_versao = QLabel(f"v{versao}", header)
+            lbl_versao.setStyleSheet("color:#a0aec0;font-size:7px;background:transparent;")
             lbl_versao.setToolTip("Versão instalada do plugin")
-            hl.addWidget(lbl_versao)
+            header.canto = lbl_versao
         estilo_btn = ("QPushButton{color:white;background:transparent;border:none;font-size:13px;}"
                       "QPushButton:hover{background:#2c5f8a;border-radius:3px;}")
         for attr, texto, dica, slot in (
@@ -104,7 +119,7 @@ class MapaBaseDialog(QWidget):
         ):
             b = QPushButton(texto)
             b.setToolTip(dica)
-            b.setFixedSize(22, 22)
+            b.setFixedSize(20, 20)
             b.setStyleSheet(estilo_btn)
             b.clicked.connect(slot)
             setattr(self, attr, b)
@@ -572,8 +587,8 @@ class MapaBaseDialog(QWidget):
             self._recolhido = False
             self._header.setMinimumSize(0, 0)
             self._header.setMaximumSize(16777215, 16777215)
-            self._header.setFixedHeight(44)
-            self.btn_recolher.setFixedSize(22, 22)
+            self._header.setFixedHeight(34)
+            self.btn_recolher.setFixedSize(20, 20)
             self.topo.layout().setContentsMargins(8, 8, 8, 0)
             self.scroll.show()
             for w in self._widgets_cabecalho():
