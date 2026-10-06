@@ -330,7 +330,7 @@ class MapaBaseDialog(QWidget):
         from .avisos import AVISO_CURTO
         lbl_aviso = QLabel(AVISO_CURTO)
         lbl_aviso.setWordWrap(True)
-        lbl_aviso.setStyleSheet("font-size:8px;color:#718096;")
+        lbl_aviso.setStyleSheet("font-size:10px;color:#2d3748;")
         corpo.addWidget(lbl_aviso)
 
         btn_fechar = QPushButton("Fechar")
