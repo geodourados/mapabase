@@ -4,7 +4,7 @@ from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar,
     QMessageBox, QFrame, QListWidget, QInputDialog, QLineEdit, QScrollArea,
     QWidget, QComboBox, QCheckBox, QListWidgetItem, QAbstractItemView, QApplication,
-    QTabWidget, QStackedWidget, QSizePolicy,
+    QTabWidget, QStackedWidget, QSizePolicy, QGridLayout,
 )
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal, QUrl, QTimer
 from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontMetrics, QColor, QPalette
@@ -868,10 +868,61 @@ class MapaBaseDialog(QWidget):
         except Exception:
             titulo = ""
         self.lbl_pos.setText(f"{self._idx_attr + 1} / {n}   {titulo}")
-        form = QgsAttributeForm(camada, feat, QgsAttributeEditorContext(), self.cont_form)
-        form.setMode(QgsAttributeEditorContext.IdentifyMode)
+        form = self._montar_formulario(camada, feat)
         self.lay_form.addWidget(form)
+        self.lay_form.addStretch()
         self._form = form
+
+    # Campos que nunca aparecem no formulário: os ocultos na tabela de atributos do
+    # projeto (a MESMA configuração que a exportação usa pra tirá-los do GPKG público,
+    # então o Fonte e o offline ficam iguais) + campos operacionais internos.
+    CAMPOS_INTERNOS = {"fid", "situacao"}
+
+    def _campos_ocultos(self, camada):
+        ocultos = set(self.CAMPOS_INTERNOS)
+        try:
+            for c in camada.attributeTableConfig().columns():
+                if c.hidden and c.name:
+                    ocultos.add(c.name)
+        except Exception:
+            pass
+        return ocultos
+
+    def _texto_valor(self, camada, indice, valor):
+        from qgis.core import QgsApplication, NULL
+        if valor is None or valor == NULL:
+            return ""
+        try:
+            cfg = camada.editorWidgetSetup(indice)
+            fmt = QgsApplication.fieldFormatterRegistry().fieldFormatter(cfg.type())
+            return str(fmt.representValue(camada, indice, cfg.config(), None, valor))
+        except Exception:
+            return str(valor)
+
+    def _montar_formulario(self, camada, feat):
+        w = QWidget()
+        grade = QGridLayout(w)
+        grade.setContentsMargins(6, 4, 6, 4)
+        grade.setHorizontalSpacing(10)
+        grade.setVerticalSpacing(4)
+        grade.setColumnStretch(1, 1)
+        ocultos = self._campos_ocultos(camada)
+        linha = 0
+        for i, campo in enumerate(camada.fields()):
+            if campo.name() in ocultos:
+                continue
+            texto = self._texto_valor(camada, i, feat.attribute(i))
+            rot = QLabel(camada.attributeDisplayName(i))
+            rot.setStyleSheet("color:#4a5568;font-weight:bold;")
+            rot.setAlignment(Qt.AlignRight | Qt.AlignTop)
+            val = QLabel(texto if texto != "" else "—")
+            val.setWordWrap(True)
+            val.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            val.setStyleSheet("" if texto != "" else "color:#a0aec0;")
+            grade.addWidget(rot, linha, 0)
+            grade.addWidget(val, linha, 1)
+            linha += 1
+        return w
 
     def _mostrar_tabela(self):
         from qgis.core import QgsFeatureRequest
@@ -896,6 +947,18 @@ class MapaBaseDialog(QWidget):
         dv = QgsDualView(self.cont_tabela)
         dv.init(camada, self.iface.mapCanvas(), req, QgsAttributeEditorContext())
         dv.setView(QgsDualView.AttributeTable)
+        # Mesmas regras do formulário: esconde os campos internos também na tabela
+        # (sem alterar a configuração da camada).
+        try:
+            cfg = camada.attributeTableConfig()
+            colunas = cfg.columns()
+            for col in colunas:
+                if col.name in self.CAMPOS_INTERNOS:
+                    col.hidden = True
+            cfg.setColumns(colunas)
+            dv.setAttributeTableConfig(cfg)
+        except Exception:
+            pass
         self.lay_tabela.addWidget(dv, 1)
         self._dual = dv
 
