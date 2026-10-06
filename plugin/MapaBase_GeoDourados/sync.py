@@ -4,6 +4,7 @@ Lógica de sincronização com a base pública do GitHub
 baixava do Google Drive — a distribuição oficial agora é via GitHub.
 """
 import glob
+import json
 import os
 import re
 import urllib.error
@@ -15,6 +16,7 @@ PASTA_MEUS_PROJETOS = "MeusProjetos"
 DEFAULT_DIR = r"C:\GeoDourados-Offline"
 
 URL_GPKG = "https://github.com/geodourados/mapabase/releases/download/latest/Mapa_GeoDourados.gpkg"
+URL_API_RELEASE = "https://api.github.com/repos/geodourados/mapabase/releases/tags/latest"
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GeoDouradosPlugin/2.0"}
 
@@ -51,17 +53,45 @@ def caminho_meu_projeto(nome, install_dir=None):
     return os.path.join(paths["meus_projetos_dir"], f"{slug_nome_projeto(nome)}.qgz")
 
 
-def obter_tamanho_remoto():
-    """Tamanho do GPKG publicado — via HEAD, não baixa nada."""
+def _arquivo_versao(gpkg_path):
+    return gpkg_path + ".versao.json"
+
+
+def obter_info_remota():
+    """(atualizado_em ISO-8601, tamanho) do GPKG na Release — via API do
+    GitHub, sem baixar nada. None se não conseguir consultar. O tamanho
+    sozinho NÃO serve pra detectar mudança: o GPKG tem páginas de tamanho
+    fixo e versões diferentes costumam ter exatamente os mesmos bytes."""
     try:
-        req = urllib.request.Request(URL_GPKG, headers=HEADERS, method="HEAD")
+        req = urllib.request.Request(URL_API_RELEASE, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=10) as r:
-            cl = r.headers.get("Content-Length")
-            if cl:
-                return int(cl)
+            dados = json.load(r)
+        for a in dados.get("assets", []):
+            if a.get("name") == GPKG_FILENAME:
+                return a.get("updated_at"), a.get("size")
     except Exception:
         pass
     return None
+
+
+def _versao_local(gpkg_path):
+    """Data (ISO-8601 UTC) do asset remoto que gerou este arquivo local;
+    sem registro (instalação antiga), usa a data de modificação do arquivo."""
+    from datetime import datetime, timezone
+    try:
+        with open(_arquivo_versao(gpkg_path), encoding="utf-8") as f:
+            return json.load(f)["atualizado_em"]
+    except Exception:
+        mtime = os.path.getmtime(gpkg_path)
+        return datetime.fromtimestamp(mtime, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _registrar_versao(gpkg_path, atualizado_em):
+    try:
+        with open(_arquivo_versao(gpkg_path), "w", encoding="utf-8") as f:
+            json.dump({"atualizado_em": atualizado_em}, f)
+    except Exception:
+        pass
 
 
 def verificar_atualizacao_disponivel(install_dir=None):
@@ -70,25 +100,20 @@ def verificar_atualizacao_disponivel(install_dir=None):
     if not os.path.exists(paths["gpkg"]):
         return True, "Base não instalada nesta pasta."
 
-    local_size = os.path.getsize(paths["gpkg"])
-    remoto_size = obter_tamanho_remoto()
-
-    if remoto_size is None:
+    remoto = obter_info_remota()
+    if remoto is None or not remoto[0]:
         return False, "Não foi possível checar (sem conexão?)."
 
-    if abs(remoto_size - local_size) > 1024:
-        diff_mb = abs(remoto_size - local_size) / 1_048_576
-        return True, (
-            f"Nova versão disponível "
-            f"(local: {local_size/1_048_576:.0f} MB | remoto: {remoto_size/1_048_576:.0f} MB)"
-        )
-
+    local = _versao_local(paths["gpkg"])
+    if remoto[0] > local:  # ISO-8601 UTC compara como texto
+        return True, f"Nova versão disponível (publicada em {remoto[0][:10]})."
     return False, "Atualizado."
 
 
 def baixar_gpkg(dest_path, progress_callback=None):
     tmp_path = dest_path + ".tmp"
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    info_remota = obter_info_remota()  # antes do download: se publicar no meio, ficará "desatualizado" e baixa de novo
 
     try:
         if progress_callback:
@@ -125,6 +150,8 @@ def baixar_gpkg(dest_path, progress_callback=None):
         if os.path.exists(dest_path):
             os.remove(dest_path)
         os.rename(tmp_path, dest_path)
+        if info_remota and info_remota[0]:
+            _registrar_versao(dest_path, info_remota[0])
         return True, ""
 
     except urllib.error.HTTPError as e:
