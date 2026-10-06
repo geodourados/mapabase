@@ -7,7 +7,7 @@ from qgis.PyQt.QtWidgets import (
     QTabWidget, QStackedWidget, QSizePolicy,
 )
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal, QUrl, QTimer
-from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontMetrics
+from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontMetrics, QColor, QPalette
 
 PLUGIN_DIR = os.path.dirname(__file__)
 
@@ -24,6 +24,27 @@ class DownloadWorker(QThread):
         from .sync import baixar_gpkg
         ok, err = baixar_gpkg(self.dest_path, progress_callback=lambda v, m: self.progress.emit(v, m))
         self.finished.emit(ok, err)
+
+
+ESTILO_BOTAO_AZUL = (
+    "QPushButton, QPushButton:enabled, QPushButton:focus, QPushButton:pressed, QPushButton:default"
+    "{background-color:#1a365d;color:#ffffff;border:none;border-radius:4px;font-weight:bold;}"
+    "QPushButton:hover{background-color:#2c5f8a;color:#ffffff;}"
+    "QPushButton:disabled{background-color:#a0aec0;color:#ffffff;}"
+)
+
+
+def estilizar_botao_azul(btn):
+    """Fundo azul com texto BRANCO em todos os estados, independente do tema do QGIS
+    (além do stylesheet, fixa a paleta do botão)."""
+    btn.setStyleSheet(ESTILO_BOTAO_AZUL)
+    pal = btn.palette()
+    branco = QColor("#ffffff")
+    for papel in (QPalette.ButtonText, QPalette.WindowText, QPalette.Text, QPalette.BrightText):
+        pal.setColor(QPalette.Active, papel, branco)
+        pal.setColor(QPalette.Inactive, papel, branco)
+        pal.setColor(QPalette.Disabled, papel, branco)
+    btn.setPalette(pal)
 
 
 class _Cabecalho(QFrame):
@@ -198,9 +219,7 @@ class MapaBaseDialog(QWidget):
 
         self.btn_atualizar = QPushButton("⬇  Baixar / Atualizar base")
         self.btn_atualizar.setFixedHeight(27)
-        self.btn_atualizar.setStyleSheet(
-            "QPushButton{background:#1a365d;color:white;border-radius:4px;font-weight:bold;}"
-            "QPushButton:hover{background:#2c5f8a;}QPushButton:disabled{background:#aaa;}")
+        estilizar_botao_azul(self.btn_atualizar)
         self.btn_atualizar.clicked.connect(self._on_atualizar)
         pb.addWidget(self.btn_atualizar)
         self.btn_abrir_oficial = QPushButton("📂  Abrir projeto oficial")
@@ -259,8 +278,7 @@ class MapaBaseDialog(QWidget):
         l2.setSpacing(3)
         b_buscar = QPushButton("🔎 Buscar")
         b_buscar.setFixedHeight(24)
-        b_buscar.setStyleSheet("QPushButton{background:#1a365d;color:white;border-radius:4px;font-weight:bold;}"
-                               "QPushButton:hover{background:#2c5f8a;}")
+        estilizar_botao_azul(b_buscar)
         b_buscar.clicked.connect(self._on_buscar)
         l2.addWidget(b_buscar)
         b_limpar = QPushButton("Limpar")
