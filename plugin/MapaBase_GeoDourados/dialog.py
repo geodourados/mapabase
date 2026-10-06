@@ -26,6 +26,8 @@ class DownloadWorker(QThread):
 
 
 class MapaBaseDialog(QWidget):
+    LARGURA_RECOLHIDO = 34  # um pouco maior que o botão X do painel
+
     def __init__(self, iface, on_fechar=None):
         super().__init__()
         self.iface = iface
@@ -490,17 +492,20 @@ class MapaBaseDialog(QWidget):
             self.btn_recolher.setToolTip("Expandir o painel")
             self.setMinimumWidth(0)
             dock.setMinimumWidth(0)
-            dock.setMaximumWidth(48)
-            self.topo.layout().setContentsMargins(4, 8, 4, 0)
-            self._header.setFixedWidth(40)
+            dock.setMaximumWidth(self.LARGURA_RECOLHIDO)
+            self.topo.layout().setContentsMargins(2, 4, 2, 0)
+            self._header.setFixedSize(self.LARGURA_RECOLHIDO - 8, 24)
+            self.btn_recolher.setFixedSize(20, 20)
             if not dock.isFloating():
-                self.iface.mainWindow().resizeDocks([dock], [44], Qt.Horizontal)
+                self.iface.mainWindow().resizeDocks([dock], [self.LARGURA_RECOLHIDO], Qt.Horizontal)
             else:
-                dock.resize(48, dock.height())
+                dock.resize(self.LARGURA_RECOLHIDO, dock.height())
         else:
             self._recolhido = False
-            self._header.setMinimumWidth(0)
-            self._header.setMaximumWidth(16777215)
+            self._header.setMinimumSize(0, 0)
+            self._header.setMaximumSize(16777215, 16777215)
+            self._header.setFixedHeight(44)
+            self.btn_recolher.setFixedSize(22, 22)
             self.topo.layout().setContentsMargins(8, 8, 8, 0)
             self.scroll.show()
             for w in self._widgets_cabecalho():
