@@ -112,11 +112,6 @@ class MapaBaseDialog(QWidget):
         hl.addWidget(tl, 1)
         from .sync import versao_plugin_local
         versao = versao_plugin_local()
-        if versao:
-            lbl_versao = QLabel(f"v{versao}", header)
-            lbl_versao.setStyleSheet("color:#a0aec0;font-size:7px;background:transparent;")
-            lbl_versao.setToolTip("Versão instalada do plugin")
-            header.canto = lbl_versao
         estilo_btn = ("QPushButton{color:white;background:transparent;border:none;font-size:13px;}"
                       "QPushButton:hover{background:#2c5f8a;border-radius:3px;}")
         for attr, texto, dica, slot in (
@@ -444,9 +439,10 @@ class MapaBaseDialog(QWidget):
         lbl_aviso.setWordWrap(True)
         lbl_aviso.setStyleSheet("font-size:9px;color:#2d3748;")
         rod.addWidget(lbl_aviso, 1)
-        b_info = QPushButton("ℹ")
-        b_info.setToolTip("Sobre os dados e termos de uso")
-        b_info.setFixedSize(24, 24)
+        b_info = QPushButton(f"ℹ  v{versao}" if versao else "ℹ")
+        b_info.setToolTip(f"Versão {versao} do plugin. Clique para ver: sobre os dados e termos de uso."
+                          if versao else "Sobre os dados e termos de uso")
+        b_info.setFixedHeight(24)
         b_info.clicked.connect(self._on_sobre_dados)
         rod.addWidget(b_info)
         corpo.addLayout(rod)
