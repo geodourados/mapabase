@@ -236,7 +236,7 @@ class MapaBaseDialog(QDialog):
                 self.btn_atualizar.setText("🔄  Atualizar Mapa Base")
             else:
                 size_mb = os.path.getsize(paths["gpkg"]) / 1_048_576
-                self._set_status(f"✅ Instalado ({size_mb:.0f} MB) — {msg}", "#eafaf1", "#27ae60")
+                self._set_status(f"✅ Baixado ({size_mb:.0f} MB) — {msg}", "#eafaf1", "#27ae60")
                 self.btn_atualizar.setText("🔄  Verificar / Atualizar")
             self.btn_abrir_oficial.setEnabled(True)
 
