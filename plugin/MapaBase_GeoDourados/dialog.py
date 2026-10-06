@@ -37,6 +37,8 @@ class MapaBaseDialog(QWidget):
         self._altura_expandida = None
         self._primeira_exibicao = True
         self._largura_antes = None
+        self._recolhido = False
+        self._largura_recolher = None
         self.dock = None
         self._build_ui()
 
@@ -62,6 +64,7 @@ class MapaBaseDialog(QWidget):
         corpo.setSpacing(5)
 
         header = QFrame()
+        self._header = header
         header.setStyleSheet("background-color: #1a365d;")
         header.setFixedHeight(44)
         hl = QHBoxLayout(header)
@@ -86,7 +89,7 @@ class MapaBaseDialog(QWidget):
         estilo_btn = ("QPushButton{color:white;background:transparent;border:none;font-size:13px;}"
                       "QPushButton:hover{background:#2c5f8a;border-radius:3px;}")
         for attr, texto, dica, slot in (
-            ("btn_recolher", "▾", "Recolher o painel (reabra pelo botão Mapa Base na barra de ferramentas)", self._on_recolher),
+            ("btn_recolher", "▸", "Recolher o painel numa faixa estreita (clique na seta para voltar)", self._on_recolher),
             ("btn_ajustar", "↕", "Auto ajustar a largura do painel ao conteúdo", self._on_ajustar),
             ("btn_maximizar", "□", "Alargar / restaurar o painel", self._on_maximizar),
         ):
@@ -335,11 +338,12 @@ class MapaBaseDialog(QWidget):
 
         btn_fechar = QPushButton("Fechar")
         btn_fechar.setFixedHeight(24)
-        btn_fechar.clicked.connect(self._on_recolher)
+        btn_fechar.clicked.connect(self._on_fechar_painel)
         corpo.addWidget(btn_fechar)
 
         self.scroll.setWidget(self.conteudo)
-        main.addWidget(self.scroll)
+        main.addWidget(self.scroll, 1)
+        main.addStretch(0)
 
     # ── Status ───────────────────────────────────────────────────────────
     def atualizar_status(self):
@@ -463,12 +467,57 @@ class MapaBaseDialog(QWidget):
         else:
             self.iface.mainWindow().resizeDocks([dock], [largura], Qt.Horizontal)
 
-    def _on_recolher(self):
-        # Esconde o painel; o botão do plugin na barra de ferramentas reabre.
+    def _on_fechar_painel(self):
         if self.dock is not None:
             self.dock.hide()
 
+    def _widgets_cabecalho(self):
+        return [w for w in self._header.children()
+                if isinstance(w, QWidget) and w is not self.btn_recolher]
+
+    def _on_recolher(self):
+        # Recolhe numa faixa estreita só com a seta (libera espaço no mapa).
+        dock = self.dock
+        if dock is None:
+            return
+        if not self._recolhido:
+            self._largura_recolher = dock.width()
+            self._recolhido = True
+            self.scroll.hide()
+            for w in self._widgets_cabecalho():
+                w.hide()
+            self.btn_recolher.setText("◂")
+            self.btn_recolher.setToolTip("Expandir o painel")
+            self.setMinimumWidth(0)
+            dock.setMinimumWidth(0)
+            dock.setMaximumWidth(48)
+            self.topo.layout().setContentsMargins(4, 8, 4, 0)
+            self._header.setFixedWidth(40)
+            if not dock.isFloating():
+                self.iface.mainWindow().resizeDocks([dock], [44], Qt.Horizontal)
+            else:
+                dock.resize(48, dock.height())
+        else:
+            self._recolhido = False
+            self._header.setMinimumWidth(0)
+            self._header.setMaximumWidth(16777215)
+            self.topo.layout().setContentsMargins(8, 8, 8, 0)
+            self.scroll.show()
+            for w in self._widgets_cabecalho():
+                w.show()
+            self.btn_recolher.setText("▸")
+            self.btn_recolher.setToolTip("Recolher o painel numa faixa estreita (clique na seta para voltar)")
+            self.setMinimumWidth(340)
+            dock.setMaximumWidth(16777215)
+            largura = self._largura_recolher or 400
+            if not dock.isFloating():
+                self.iface.mainWindow().resizeDocks([dock], [largura], Qt.Horizontal)
+            else:
+                dock.resize(largura, dock.height())
+
     def _on_ajustar(self):
+        if self._recolhido:
+            self._on_recolher()
         largura = max(self.conteudo.sizeHint().width() + 28, 360)
         self._definir_largura(largura)
         self._largura_antes = None
@@ -478,6 +527,8 @@ class MapaBaseDialog(QWidget):
         dock = self.dock
         if dock is None:
             return
+        if self._recolhido:
+            self._on_recolher()
         if self._largura_antes is None:
             self._largura_antes = dock.width()
             self._definir_largura(int(self.iface.mainWindow().width() * 0.5))
