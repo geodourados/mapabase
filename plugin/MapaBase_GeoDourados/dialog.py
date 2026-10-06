@@ -211,6 +211,18 @@ class MapaBaseDialog(QDialog):
         corpo.addLayout(linha_links1)
         corpo.addLayout(linha_links2)
 
+        btn_sobre = QPushButton("ℹ  Sobre os dados e termos de uso")
+        btn_sobre.setFixedHeight(24)
+        btn_sobre.setStyleSheet("font-size:9px;")
+        btn_sobre.clicked.connect(self._on_sobre_dados)
+        corpo.addWidget(btn_sobre)
+
+        from .avisos import AVISO_CURTO
+        lbl_aviso = QLabel(AVISO_CURTO)
+        lbl_aviso.setWordWrap(True)
+        lbl_aviso.setStyleSheet("font-size:8px;color:#718096;")
+        corpo.addWidget(lbl_aviso)
+
         btn_fechar = QPushButton("Fechar")
         btn_fechar.setFixedHeight(24)
         btn_fechar.clicked.connect(self.close)
@@ -296,6 +308,10 @@ class MapaBaseDialog(QDialog):
         self._worker.finished.connect(self._on_download_finished)
         self._worker.start()
 
+    def _on_sobre_dados(self):
+        from .avisos import mostrar_aviso_dados
+        mostrar_aviso_dados(self)
+
     def _on_download_finished(self, ok, erro):
         self.btn_atualizar.setEnabled(True)
         if not ok:
@@ -305,6 +321,8 @@ class MapaBaseDialog(QDialog):
         self.prog_bar.setValue(100)
         self.lbl_prog.setText("✅ Concluído!")
         self.atualizar_status()
+        from .avisos import mostrar_aviso_primeira_vez
+        mostrar_aviso_primeira_vez(self)
 
     # ── Abrir projeto oficial ────────────────────────────────────────────
     def _on_abrir_oficial(self):

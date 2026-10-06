@@ -83,3 +83,12 @@ Os dados são de responsabilidade da Secretaria de Planejamento de
 Dourados-MS, disponibilizados nos termos da Lei nº 4.390/2019
 (caráter ostensivo — Art. 9º). Consulte a lei para condições de uso por
 terceiros: <http://leis.org/qzfuw>
+
+Dados públicos, também observada a Lei de Acesso à Informação (Lei nº 12.527/2011).
+
+> **Atenção — base em atualização constante.** Pode conter erros, omissões ou
+> imprecisões: os dados vêm de digitalizações em geoprocessamento, restituição
+> aerofotogramétrica e outros processos de produção cartográfica. **Não substitui**
+> matrícula, certidões, levantamento topográfico/georreferenciado nem projetos
+> aprovados, e não deve ser usada como prova de propriedade, posse ou limites.
+> Confirme junto à Prefeitura antes de decisões que dependam de precisão.
