@@ -47,9 +47,19 @@ def _rotulo_lote(feat):
     if _valor(feat, "matricula"):
         partes.append("Mat. " + _valor(feat, "matricula"))
     qd, lt = _valor(feat, "quadra_cartorio"), _valor(feat, "lote_cartorio")
-    if qd or lt:
-        partes.append(f"Q{qd or '?'} L{lt or '?'}")
+    ql = " ".join(p for p in ((f"Q{qd}" if qd else ""), (f"L{lt}" if lt else "")) if p)
+    if ql:
+        partes.append(ql)
     return " — ".join(partes)
+
+
+def _chaves_lote(feat):
+    return {
+        "inscricao": _valor(feat, "insc_imob"),
+        "matricula": _valor(feat, "matricula"),
+        "quadra": _valor(feat, "quadra_cartorio"),
+        "lote": _valor(feat, "lote_cartorio"),
+    }
 
 
 def _buscar_lotes(layer, tipo, termo, exata):
@@ -67,7 +77,8 @@ def _buscar_lotes(layer, tipo, termo, exata):
     if not _tem(layer, campo):
         return [], f"A camada de lotes não tem o campo '{campo}'."
     req = QgsFeatureRequest().setFilterExpression(expr).setLimit(LIMITE)
-    itens = [{"rotulo": _rotulo_lote(f), "layer": layer, "fids": [f.id()]} for f in layer.getFeatures(req)]
+    itens = [{"rotulo": _rotulo_lote(f), "layer": layer, "fids": [f.id()], "chaves": _chaves_lote(f)}
+             for f in layer.getFeatures(req)]
     return itens, ""
 
 
@@ -98,6 +109,33 @@ def _buscar_por_nome(layer, campos_nome, termo, exata, rotulo_extra=None):
         rot = g["rotulo"] + (f"  ({g['extra']})" if g.get("extra") else "")
         itens.append({"rotulo": rot, "layer": layer, "fids": g["fids"]})
     return itens, ""
+
+
+CRITERIOS_LOTE = [("Inscrição", "inscricao"), ("Matrícula", "matricula"), ("Quadra / Lote", "quadra_lote")]
+CRITERIOS_NOME = [("Nome", "nome")]
+
+
+def _natural(texto):
+    """Ordem 'natural': 2 antes de 10; vazio por último."""
+    texto = (texto or "").strip()
+    if not texto:
+        return [(1, 0, "")]
+    return [(0, int(p), "") if p.isdigit() else (0, 0, p.lower()) for p in re.split(r"(\d+)", texto) if p]
+
+
+def ordenar(itens, criterio, decrescente=False):
+    """Ordena a lista de resultados (in place) e devolve a mesma lista."""
+    def chave(it):
+        c = it.get("chaves")
+        if not c:
+            return _natural(_norm(it["rotulo"]))
+        if criterio == "matricula":
+            return _natural(c["matricula"]) + _natural(c["inscricao"])
+        if criterio == "quadra_lote":
+            return _natural(c["quadra"]) + _natural(c["lote"]) + _natural(c["inscricao"])
+        return _natural(c["inscricao"])
+    itens.sort(key=chave, reverse=decrescente)
+    return itens
 
 
 def buscar(project, tipo, termo, exata):
@@ -134,7 +172,7 @@ def lote_selecionado(project):
     if len(sel) != 1:
         return None, "Selecione exatamente 1 lote no mapa."
     f = sel[0]
-    return {"rotulo": _rotulo_lote(f), "layer": lotes, "fids": [f.id()]}, ""
+    return {"rotulo": _rotulo_lote(f), "layer": lotes, "fids": [f.id()], "chaves": _chaves_lote(f)}, ""
 
 
 def zoom_itens(iface, itens, piscar=True):

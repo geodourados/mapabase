@@ -272,10 +272,26 @@ class MapaBaseDialog(QWidget):
         l2.addWidget(b_sel)
         pq.addLayout(l2)
 
+        linha_ord = QHBoxLayout()
+        linha_ord.setSpacing(3)
         self.lbl_busca = QLabel("")
         self.lbl_busca.setWordWrap(True)
         self.lbl_busca.setStyleSheet("font-size:9px;color:#555;")
-        pq.addWidget(self.lbl_busca)
+        linha_ord.addWidget(self.lbl_busca, 1)
+        self.lbl_ordenar = QLabel("Ordenar:")
+        self.lbl_ordenar.setStyleSheet("font-size:9px;color:#555;")
+        linha_ord.addWidget(self.lbl_ordenar)
+        self.cb_ordem = QComboBox()
+        self.cb_ordem.setStyleSheet("font-size:9px;")
+        self.cb_ordem.currentIndexChanged.connect(lambda _=None: self._reordenar_resultados())
+        linha_ord.addWidget(self.cb_ordem)
+        self.btn_sentido = QPushButton("↑")
+        self.btn_sentido.setFixedSize(22, 20)
+        self.btn_sentido.setToolTip("Sentido da ordenação: crescente (↑) ou decrescente (↓).")
+        self.btn_sentido.clicked.connect(self._alternar_sentido)
+        linha_ord.addWidget(self.btn_sentido)
+        pq.addLayout(linha_ord)
+        self._ordem_desc = False
 
         l3 = QHBoxLayout()
         l3.setSpacing(2)
@@ -640,14 +656,42 @@ class MapaBaseDialog(QWidget):
             busca.zoom_itens(self.iface, itens)
 
     def _mostrar_resultados(self, itens, msg):
+        from . import busca
         self._itens_busca = itens
+        lotes = bool(itens) and bool(itens[0].get("chaves"))
+        criterios = busca.CRITERIOS_LOTE if lotes else busca.CRITERIOS_NOME
+        atual = self.cb_ordem.currentData()
+        self.cb_ordem.blockSignals(True)
+        self.cb_ordem.clear()
+        for rotulo, chave in criterios:
+            self.cb_ordem.addItem(rotulo, chave)
+        i = self.cb_ordem.findData(atual)
+        self.cb_ordem.setCurrentIndex(i if i >= 0 else 0)
+        self.cb_ordem.blockSignals(False)
+        mostrar = len(itens) > 1
+        for w in (self.lbl_ordenar, self.cb_ordem, self.btn_sentido):
+            w.setVisible(mostrar)
+        self.lbl_busca.setText(msg)
+        self._preencher_lista()
+
+    def _preencher_lista(self):
+        from . import busca
+        busca.ordenar(self._itens_busca, self.cb_ordem.currentData() or "inscricao", self._ordem_desc)
         self.lista_busca.clear()
-        for i, it in enumerate(itens):
+        for i, it in enumerate(self._itens_busca):
             li = QListWidgetItem(it["rotulo"])
             li.setData(Qt.UserRole, i)
             self.lista_busca.addItem(li)
-        self.lbl_busca.setText(msg)
         self._ajustar_altura_lista()
+
+    def _reordenar_resultados(self):
+        if self._itens_busca:
+            self._preencher_lista()
+
+    def _alternar_sentido(self):
+        self._ordem_desc = not self._ordem_desc
+        self.btn_sentido.setText("↓" if self._ordem_desc else "↑")
+        self._reordenar_resultados()
 
     def _ajustar_altura_lista(self):
         n = self.lista_busca.count()
