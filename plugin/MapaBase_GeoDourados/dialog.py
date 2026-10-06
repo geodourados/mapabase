@@ -109,7 +109,12 @@ class MapaBaseDialog(QWidget):
 
         header = _Cabecalho()
         self._header = header
-        header.setStyleSheet("background-color: #1a365d;")
+        header.setObjectName("cabecalho")
+        # Fundo azul SÓ na faixa (um "background-color" solto vazava para os tooltips,
+        # deixando o texto de ajuda preto sobre azul).
+        header.setStyleSheet(
+            "QFrame#cabecalho{background-color:#1a365d;}"
+            "QToolTip{color:#1a202c;background-color:#fffbe6;border:1px solid #a0aec0;}")
         header.setFixedHeight(34)
         hl = QHBoxLayout(header)
         hl.setContentsMargins(6, 3, 6, 3)
