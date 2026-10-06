@@ -58,6 +58,24 @@ def resolver_layer_lotes(project):
     return resolver_layer(project, TABELA_LOTES)
 
 
+VARIAVEIS_CROQUI = ("estacao_ip", "base_atualizada_em", "lote_alvo")
+
+
+def _limpar_variaveis(project, layout, atlas):
+    from qgis.core import QgsExpressionContextUtils
+    try:
+        for nome in VARIAVEIS_CROQUI:
+            QgsExpressionContextUtils.removeProjectVariable(project, nome)
+        nomes = layout.customProperty("variableNames") or []
+        valores = layout.customProperty("variableValues") or []
+        manter = [(n, v) for n, v in zip(nomes, valores) if n not in VARIAVEIS_CROQUI]
+        layout.setCustomProperty("variableNames", [n for n, _ in manter])
+        layout.setCustomProperty("variableValues", [v for _, v in manter])
+        atlas.setEnabled(False)
+    except Exception:
+        pass
+
+
 def gerar_croqui(iface, gpkg_path, escala_fixa=1000):
     """escala_fixa=1000 -> sempre 1:1000. escala_fixa=None -> usa a
     escala atual da tela, arredondada pra escala cadastral padrão mais
@@ -159,3 +177,6 @@ def gerar_croqui(iface, gpkg_path, escala_fixa=1000):
         if mapitem is not None and escala_anterior is not None:
             mapitem.setScale(escala_anterior)
         atlas.endRender()
+        # Não deixa rastro no projeto: as variáveis (IP da estação, lote) são só pra
+        # renderizar o PDF e, se ficassem, seriam salvas no .qgs e até publicadas.
+        _limpar_variaveis(project, layout, atlas)
