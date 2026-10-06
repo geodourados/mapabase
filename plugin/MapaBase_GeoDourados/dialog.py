@@ -133,16 +133,16 @@ class MapaBaseDialog(QWidget):
         hl.addWidget(tl, 1)
         from .sync import versao_plugin_local
         versao = versao_plugin_local()
-        estilo_btn = ("QPushButton{color:white;background:transparent;border:none;font-size:13px;}"
+        estilo_btn = ("QPushButton{color:#ffffff;background:transparent;border:none;font-size:17px;font-weight:bold;}"
                       "QPushButton:hover{background:#2c5f8a;border-radius:3px;}")
         for attr, texto, dica, slot in (
-            ("btn_recolher", "▸", "Recolher o painel numa faixa estreita (clique na seta para voltar)", self._on_recolher),
-            ("btn_ajustar", "↕", "Auto ajustar a largura do painel ao conteúdo", self._on_ajustar),
-            ("btn_maximizar", "□", "Alargar / restaurar o painel", self._on_maximizar),
+            ("btn_recolher", "»", "Recolher o painel numa faixa estreita (clique em « para voltar)", self._on_recolher),
+            ("btn_ajustar", "↔", "Auto ajustar: deixa o painel na largura ideal para o conteúdo", self._on_ajustar),
+            ("btn_maximizar", "□", "Alargar o painel até metade da tela do QGIS (clique de novo para restaurar)", self._on_maximizar),
         ):
             b = QPushButton(texto)
             b.setToolTip(dica)
-            b.setFixedSize(20, 20)
+            b.setFixedSize(24, 24)
             b.setStyleSheet(estilo_btn)
             b.clicked.connect(slot)
             setattr(self, attr, b)
@@ -610,14 +610,14 @@ class MapaBaseDialog(QWidget):
             self.scroll.hide()
             for w in self._widgets_cabecalho():
                 w.hide()
-            self.btn_recolher.setText("◂")
+            self.btn_recolher.setText("«")
             self.btn_recolher.setToolTip("Expandir o painel")
             self.setMinimumWidth(0)
             dock.setMinimumWidth(0)
             dock.setMaximumWidth(self.LARGURA_RECOLHIDO)
             self.topo.layout().setContentsMargins(2, 4, 2, 0)
             self._header.setFixedSize(self.LARGURA_RECOLHIDO - 8, 24)
-            self.btn_recolher.setFixedSize(20, 20)
+            self.btn_recolher.setFixedSize(24, 24)
             if not dock.isFloating():
                 self.iface.mainWindow().resizeDocks([dock], [self.LARGURA_RECOLHIDO], Qt.Horizontal)
             else:
@@ -627,13 +627,13 @@ class MapaBaseDialog(QWidget):
             self._header.setMinimumSize(0, 0)
             self._header.setMaximumSize(16777215, 16777215)
             self._header.setFixedHeight(34)
-            self.btn_recolher.setFixedSize(20, 20)
+            self.btn_recolher.setFixedSize(24, 24)
             self.topo.layout().setContentsMargins(8, 8, 8, 0)
             self.scroll.show()
             for w in self._widgets_cabecalho():
                 w.show()
-            self.btn_recolher.setText("▸")
-            self.btn_recolher.setToolTip("Recolher o painel numa faixa estreita (clique na seta para voltar)")
+            self.btn_recolher.setText("»")
+            self.btn_recolher.setToolTip("Recolher o painel numa faixa estreita (clique em « para voltar)")
             self.setMinimumWidth(340)
             dock.setMaximumWidth(16777215)
             largura = self._largura_recolher or 400
@@ -646,7 +646,7 @@ class MapaBaseDialog(QWidget):
         if self._recolhido:
             self._on_recolher()
         # Cabeçalho em uma linha: título + brasão + 3 botões + margens.
-        minimo_cab = self._larg_titulo + 26 + 3 * 20 + 4 * 4 + 12 + 16 + 2
+        minimo_cab = self._larg_titulo + 26 + 3 * 24 + 4 * 4 + 12 + 16 + 2
         largura = max(self.conteudo.sizeHint().width() + 28, minimo_cab, 360)
         self._definir_largura(largura)
         self._largura_antes = None
