@@ -9,6 +9,14 @@ Fonte oficial: Núcleo de Inteligência Geográfica — Departamento de
 Geoprocessamento — Secretaria Municipal de Planejamento — Prefeitura
 Municipal de Dourados-MS.
 
+## Não tem o QGIS instalado?
+
+Baixe o **QGIS Portable** (~650 MB, já vem com o plugin Mapa Base instalado e não precisa de instalação):
+
+<https://github.com/geodourados/mapabase/releases/download/latest/QGIS_Portable_MapaBase.zip>
+
+Descompacte em qualquer pasta e abra **`Abrir_QGIS_MapaBase.bat`**. No plugin, clique em *Baixar Mapa Base* e depois em *Abrir projeto oficial*.
+
 ## Uso rápido no QGIS
 
 Se você usa QGIS (Windows) e só quer abrir o mapa completo, sem se preocupar

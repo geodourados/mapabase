@@ -103,6 +103,11 @@ if not defined QGIS_EXE if exist "C:\OSGeo4W64\bin\qgis-ltr-bin.exe" set "QGIS_E
 if not defined QGIS_EXE (
     echo.
     echo QGIS nao foi encontrado em "C:\Program Files".
+    echo.
+    echo SEM QGIS INSTALADO? Baixe o QGIS Portable ^(ja vem com o plugin, nao precisa instalar^):
+    echo   https://github.com/geodourados/mapabase/releases/download/latest/QGIS_Portable_MapaBase.zip
+    echo Descompacte e abra "Abrir_QGIS_MapaBase.bat".
+    echo.
     echo O download terminou normalmente - abra manualmente pelo QGIS:
     echo   %DEST_GPKG%
     echo ^(projeto: %NOME_PROJETO%^)
