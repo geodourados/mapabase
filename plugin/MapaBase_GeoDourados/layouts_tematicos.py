@@ -55,7 +55,9 @@ def criar_tema():
 
 def fora_da_legenda(l):
     # imagens de fundo (XYZ/WMS/raster) e camadas "ao vivo" do Waze não entram na legenda
-    return l is None or l.type() != QgsMapLayerType.VectorLayer or 'waze' in l.name().lower()
+    # camadas temporárias (memória: prévias, desenhos) também não entram na legenda
+    return (l is None or l.type() != QgsMapLayerType.VectorLayer or 'waze' in l.name().lower()
+            or l.providerType() == 'memory')
 
 
 def podar_legenda(raiz, visiveis, escala=None):
@@ -66,9 +68,6 @@ def podar_legenda(raiz, visiveis, escala=None):
     def podar(g):
         for n in list(g.children()):
             if QgsLayerTree.isGroup(n):
-                if n.name().strip().lower() in ('pranchas', 'sigri pranchas'):
-                    g.removeChildNode(n)      # prévia das folhas (SIGRI) não entra na legenda
-                    continue
                 podar(n)
                 if not n.children():
                     g.removeChildNode(n)

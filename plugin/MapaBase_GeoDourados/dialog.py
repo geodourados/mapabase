@@ -1506,17 +1506,17 @@ class MapaBaseDialog(QWidget):
             self.lbl_cep.setText("⚠ Não encontrei eixo viário perto desse lote.")
             return
         self.iface.mapCanvas().flashGeometries([f["geom"] for f in frentes], frentes[0]["crs"])
-        linhas = ["🏠 Frente do lote:"]
+        linhas = ["🏠 Frente do lote (da menor para a maior testada):"]
         for f in frentes:
             linhas.append(f"   • {f['nome']} — CEP {cep.formatar(f['cep8']) if f['cep8'] else 'não cadastrado'}"
-                          f" ({f['distancia']:.0f} m)")
+                          f" (testada {f['testada']:.1f} m)")
         com_cep = [f for f in frentes if f["cep8"]]
         prefixo = "\n".join(linhas) + "\n"
         if not com_cep:
             self.lbl_cep.setText(prefixo + "⚠ Nenhum dos trechos tem CEP cadastrado.")
             return
         if len(com_cep) > 1:
-            prefixo += "(lote de esquina: validando o CEP do trecho mais próximo)\n"
+            prefixo += "(lote de esquina: validando o CEP da menor testada)\n"
         self.txt_cep.setText(cep.formatar(com_cep[0]["cep8"]))
         self._validar_cep(com_cep[0]["cep8"], prefixo)
 

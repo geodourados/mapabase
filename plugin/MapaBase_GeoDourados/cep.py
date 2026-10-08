@@ -95,9 +95,20 @@ def QgsGeometry_copia(g):
     return QgsGeometry(g)
 
 
+def _testada(lote, rua_geom, dist, folga):
+    """Metros da divisa do lote que correm ao longo da rua (testada): trecho do contorno do lote
+    dentro de uma faixa em volta do eixo, com raio = distância do lote ao eixo + folga."""
+    contorno = QgsGeometry_copia(lote)
+    from qgis.core import QgsWkbTypes
+    contorno = contorno.convertToType(QgsWkbTypes.LineGeometry, False) or contorno      # polígono -> linha (divisa)
+    faixa = rua_geom.buffer(dist + folga, 8)
+    return contorno.intersection(faixa).length()
+
+
 def eixos_da_frente(project, geom_lote, crs_lote, folga=6.0):
-    """Eixos viários que fazem frente ao lote: o mais próximo e os que estão a até `folga`
-    metros dele (lote de esquina tem duas frentes). Lista de dicts ordenada por distância."""
+    """Eixos viários que fazem frente ao lote, ordenados pela MENOR TESTADA (trecho de divisa do lote
+    voltado para a rua). Lote de esquina tem duas frentes: a de menor testada vem primeiro.
+    Lista de dicts com nome, cep8, distancia, testada, geom, crs."""
     from qgis.core import QgsFeatureRequest
     layer = camadas_principais(project)["logradouros"]
     if layer is None:
@@ -121,12 +132,19 @@ def eixos_da_frente(project, geom_lote, crs_lote, folga=6.0):
     if not achados:
         return []
     corte = achados[0]["distancia"] + folga
-    vistos, saida = set(), []
+    juntos = {}
     for r in achados:
         if r["distancia"] > corte:
             break
+        r["testada"] = _testada(lote, r["geom"], r["distancia"], folga)
         chave = (r["nome"], r["cep8"])
-        if chave not in vistos:
-            vistos.add(chave)
-            saida.append(r)
+        if chave in juntos:                      # mesma rua em vários trechos: soma a testada
+            juntos[chave]["testada"] += r["testada"]
+            juntos[chave]["distancia"] = min(juntos[chave]["distancia"], r["distancia"])
+        else:
+            juntos[chave] = r
+    saida = list(juntos.values())
+    reais = [r for r in saida if r["testada"] >= 2.0]      # ignora quem só encosta na quina
+    saida = reais or saida
+    saida.sort(key=lambda r: (r["testada"], r["distancia"]))
     return saida
