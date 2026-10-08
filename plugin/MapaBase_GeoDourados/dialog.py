@@ -4,7 +4,7 @@ from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar,
     QMessageBox, QFrame, QListWidget, QInputDialog, QLineEdit, QScrollArea,
     QWidget, QComboBox, QCheckBox, QListWidgetItem, QAbstractItemView, QApplication,
-    QTabWidget, QStackedWidget, QSizePolicy, QGridLayout,
+    QTabWidget, QStackedWidget, QSizePolicy, QGridLayout, QSlider,
 )
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal, QUrl, QTimer
 from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontMetrics, QColor, QPalette
@@ -534,6 +534,40 @@ class MapaBaseDialog(QWidget):
         self.lbl_wms.setWordWrap(True)
         self.lbl_wms.setStyleSheet("font-size:9px;color:#555;")
         pw.addWidget(self.lbl_wms)
+        pw.addWidget(linha_h())
+        pw.addWidget(titulo_secao("MapBiomas – Coleção 11 (1985–2025)"))
+        info_mb = QLabel("Uso e cobertura da terra, lido direto do serviço do MapBiomas (precisa de internet; nada é "
+                         "baixado). Escolha o ano e adicione; com a camada já no projeto, mudar o ano troca a imagem. Aproxime o zoom: o arquivo cobre o Brasil todo e a imagem aparece nítida só em escalas maiores que ~1:250.000.")
+        info_mb.setWordWrap(True)
+        info_mb.setStyleSheet("font-size:9px;color:#666;")
+        pw.addWidget(info_mb)
+        from .mapbiomas import ANOS as _ANOS_MB
+        linha_mb = QHBoxLayout()
+        self.sl_mb = QSlider(Qt.Horizontal)
+        self.sl_mb.setRange(*_ANOS_MB)
+        self.sl_mb.setValue(_ANOS_MB[1])
+        self.sl_mb.setTickPosition(QSlider.TicksBelow)
+        self.sl_mb.setTickInterval(5)
+        self.lb_mb = QLabel(str(_ANOS_MB[1]))
+        self.lb_mb.setProperty("fonte_uniforme", True)
+        self.sl_mb.valueChanged.connect(lambda a: self.lb_mb.setText(str(a)))
+        self.sl_mb.sliderReleased.connect(self._on_mapbiomas_ano)
+        linha_mb.addWidget(self.sl_mb, 1)
+        linha_mb.addWidget(self.lb_mb)
+        pw.addLayout(linha_mb)
+        b_mb = QPushButton("🌿  Adicionar MapBiomas ao projeto")
+        b_mb.setFixedHeight(26)
+        b_mb.clicked.connect(self._on_mapbiomas_ano)
+        pw.addWidget(b_mb)
+        self.lbl_mb = QLabel("")
+        self.lbl_mb.setWordWrap(True)
+        self.lbl_mb.setStyleSheet("font-size:9px;color:#555;")
+        pw.addWidget(self.lbl_mb)
+        lic_mb = QLabel("Fonte: Projeto MapBiomas – Coleção 11 da Série Anual de Mapas de Uso e Cobertura da Terra "
+                        "do Brasil (CC BY 4.0) – mapbiomas.org")
+        lic_mb.setWordWrap(True)
+        lic_mb.setStyleSheet("font-size:9px;color:#666;")
+        pw.addWidget(lic_mb)
         pw.addStretch()
 
         # ── Aba COMPLEMENTO (IBGE e rural; GeoPackage separado da base oficial) ──
@@ -1280,6 +1314,19 @@ class MapaBaseDialog(QWidget):
         finally:
             QApplication.restoreOverrideCursor()
         self.lbl_comp_msg.setText(("✅ " if ok else "⚠ ") + msg)
+
+    def _on_mapbiomas_ano(self):
+        from qgis.core import QgsProject
+        from . import mapbiomas
+        # solto o slider sem a camada no projeto: só o botão adiciona; com ela, troca o ano
+        if not mapbiomas.camadas(QgsProject.instance()) and self.sender() is self.sl_mb:
+            return
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            ok, msg = mapbiomas.adicionar(QgsProject.instance(), self.sl_mb.value())
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.lbl_mb.setText(("✅ " if ok else "⚠ ") + msg)
 
     def _on_wms_adicionar(self, serv):
         from qgis.core import QgsProject
