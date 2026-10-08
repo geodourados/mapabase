@@ -535,6 +535,17 @@ class MapaBaseDialog(QWidget):
         self.lbl_wms.setStyleSheet("font-size:9px;color:#555;")
         pw.addWidget(self.lbl_wms)
         pw.addWidget(linha_h())
+        pw.addWidget(titulo_secao("Comparar imagens (cortina)"))
+        info_cmp = QLabel("Compara duas imagens lado a lado, com uma linha que você arrasta no mapa: satélite de "
+                          "datas diferentes (Esri Wayback, Sentinel-2, NASA), MapBiomas ou uma camada do projeto.")
+        info_cmp.setWordWrap(True)
+        info_cmp.setStyleSheet("font-size:9px;color:#666;")
+        pw.addWidget(info_cmp)
+        b_cmp = QPushButton("🔀  Abrir a cortina")
+        b_cmp.setFixedHeight(26)
+        b_cmp.clicked.connect(self._on_comparar)
+        pw.addWidget(b_cmp)
+        pw.addWidget(linha_h())
         pw.addWidget(titulo_secao("MapBiomas – Coleção 11 (1985–2025)"))
         info_mb = QLabel("Uso e cobertura da terra, lido direto do serviço do MapBiomas (precisa de internet; nada é "
                          "baixado). Escolha o ano e adicione; com a camada já no projeto, mudar o ano troca a imagem. Aproxime o zoom: o arquivo cobre o Brasil todo e a imagem aparece nítida só em escalas maiores que ~1:250.000.")
@@ -1314,6 +1325,10 @@ class MapaBaseDialog(QWidget):
         finally:
             QApplication.restoreOverrideCursor()
         self.lbl_comp_msg.setText(("✅ " if ok else "⚠ ") + msg)
+
+    def _on_comparar(self):
+        from . import comparar
+        comparar.abrir(self.iface)
 
     def _on_mapbiomas_ano(self):
         from qgis.core import QgsProject
