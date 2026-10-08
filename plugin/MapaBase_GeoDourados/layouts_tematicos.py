@@ -15,7 +15,7 @@ from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QFont, QColor
 
 # Estado da geração em curso (preenchido por criar_layouts; as funções de desenho leem daqui)
-P = LM = EXT = VISIVEIS = None
+P = LM = EXT = VISIVEIS = DESTAQUE = None
 LOGO_BRASAO = LOGO_GEO = LOGO_SEPLAN = LOGO_NORTE = None
 AQUI = os.path.dirname(os.path.abspath(__file__))
 MAP_ID = 'Mapa principal'
@@ -57,7 +57,7 @@ def fora_da_legenda(l):
     return l is None or l.type() != QgsMapLayerType.VectorLayer or 'waze' in l.name().lower()
 
 
-def podar_legenda(raiz, visiveis):
+def podar_legenda(raiz, visiveis, escala=None):
     """Poda a árvore PRÓPRIA da legenda (criada pelo QGIS ao desligar o auto-update).
 
     Não usar setRootGroup() com um clone criado no Python: o objeto é coletado e o QGIS fecha.
@@ -68,7 +68,8 @@ def podar_legenda(raiz, visiveis):
                 podar(n)
                 if not n.children():
                     g.removeChildNode(n)
-            elif n.layerId() not in visiveis or fora_da_legenda(n.layer()):
+            elif (n.layerId() not in visiveis or fora_da_legenda(n.layer())
+                  or (escala and n.layer().hasScaleBasedVisibility() and not n.layer().isInScaleRange(escala))):
                 g.removeChildNode(n)
     podar(raiz)
 
@@ -231,8 +232,16 @@ def build(fmt, W, H, m, orient):
     mp.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, QgsUnitTypes.LayoutMillimeters))
     mp.zoomToExtent(EXT)
     mp.setScale(nice_up(mp.scale()))
-    mp.setFollowVisibilityPreset(True)
-    mp.setFollowVisibilityPresetName(TEMA)
+    if DESTAQUE is not None:
+        # tema de impressão reproduzido à mão (camadas + estilos) para poder incluir o lote em destaque no topo
+        mt = P.mapThemeCollection()
+        mp.setKeepLayerSet(True)
+        mp.setLayers([DESTAQUE] + list(mt.mapThemeVisibleLayers(TEMA)))
+        mp.setKeepLayerStyles(True)
+        mp.setLayerStyleOverrides(mt.mapThemeStyleOverrides(TEMA))
+    else:
+        mp.setFollowVisibilityPreset(True)
+        mp.setFollowVisibilityPresetName(TEMA)
     L.setReferenceMap(mp)
 
     # Grade UTM (quadrícula) – anotações à esquerda/inferior
@@ -355,7 +364,7 @@ def build(fmt, W, H, m, orient):
     leg.setLinkedMap(mp)
     leg.setTitle('LEGENDA')
     leg.setAutoUpdateModel(False)
-    podar_legenda(leg.model().rootGroup(), VISIVEIS)
+    podar_legenda(leg.model().rootGroup(), VISIVEIS, mp.scale())
     leg.setLegendFilterByMapEnabled(True)
     leg.setResizeToContents(False)
     leg.setColumnCount(2 if (orient == 'Paisagem' and fmt in ('A0', 'A1')) else 1)
@@ -467,6 +476,29 @@ def build(fmt, W, H, m, orient):
     return nome, mp.scale(), step
 
 
+NOME_DESTAQUE = 'Lote selecionado (destaque)'
+
+
+def _preparar_destaque():
+    """Camada temporária com o(s) lote(s) selecionado(s), contorno pontilhado (mesmo estilo do croqui).
+    Fica registrada no projeto (fora da árvore) para os layouts a enxergarem; None se não há seleção."""
+    from .croqui import resolver_layer_lotes, _camada_destaque
+    for antiga in P.mapLayersByName(NOME_DESTAQUE):
+        P.removeMapLayer(antiga.id())
+    lotes = resolver_layer_lotes(P)
+    if lotes is None or not 0 < lotes.selectedFeatureCount() <= 200:
+        return None
+    feats = lotes.selectedFeatures()
+    geom = QgsGeometry.collectGeometry([f.geometry() for f in feats if not f.geometry().isNull()])
+    feat = QgsFeature(feats[0])
+    feat.setGeometry(geom)
+    camada = _camada_destaque(lotes, feat)
+    if camada is None:
+        return None
+    P.addMapLayer(camada, False)
+    return camada
+
+
 def criar_layouts(extensao, projeto=None, pasta_logos=None, formatos=None, variaveis=None):
     """Cria/recria os layouts. Retorna [(nome, escala, passo_grade_geo_s), ...].
 
@@ -477,7 +509,7 @@ def criar_layouts(extensao, projeto=None, pasta_logos=None, formatos=None, varia
     formatos     subconjunto de FORMATOS (padrão: os 7).
     variaveis    sobrescreve VARS (responsável técnico/contato) – gravadas como variáveis do projeto.
     """
-    global P, LM, EXT, VISIVEIS, LOGO_BRASAO, LOGO_GEO, LOGO_SEPLAN, LOGO_NORTE
+    global P, LM, EXT, VISIVEIS, DESTAQUE, LOGO_BRASAO, LOGO_GEO, LOGO_SEPLAN, LOGO_NORTE
     P = projeto or QgsProject.instance()
     LM = P.layoutManager()
     EXT = QgsRectangle(extensao)
@@ -493,4 +525,5 @@ def criar_layouts(extensao, projeto=None, pasta_logos=None, formatos=None, varia
         if not QgsExpressionContextUtils.projectScope(P).hasVariable(k) or variaveis:
             QgsExpressionContextUtils.setProjectVariable(P, k, v)
     VISIVEIS = criar_tema()
+    DESTAQUE = _preparar_destaque()
     return [build(*f) for f in (formatos or FORMATOS)]

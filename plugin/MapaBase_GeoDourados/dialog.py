@@ -392,7 +392,7 @@ class MapaBaseDialog(QWidget):
         pq.addWidget(linha_h())
         pq.addWidget(titulo_secao("Layouts de impressão (ABNT, A0 a A4)"))
         info_lay = QLabel("Cria 7 layouts (A0–A4 paisagem; A3 e A4 retrato) com a área visível da tela, "
-                          "quadrícula, legenda, norte e escala. Depois: Projeto › Gerenciador de layouts.")
+                          "quadrícula, legenda (só o que aparece no mapa), norte e escala. O lote selecionado sai com contorno pontilhado. Depois: Projeto › Gerenciador de layouts.")
         info_lay.setWordWrap(True)
         info_lay.setStyleSheet("font-size:9px;color:#666;")
         pq.addWidget(info_lay)
