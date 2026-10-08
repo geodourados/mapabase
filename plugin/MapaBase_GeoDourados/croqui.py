@@ -58,7 +58,7 @@ def resolver_layer_lotes(project):
     return resolver_layer(project, TABELA_LOTES)
 
 
-COR_DESTAQUE = "#e6007e"
+COR_DESTAQUE = "#000000"
 
 
 def _camada_destaque(layer_lotes, feat):

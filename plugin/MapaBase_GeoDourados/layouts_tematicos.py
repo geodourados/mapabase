@@ -9,6 +9,7 @@ Autor: Ênio Alencar da Silva – SEPLAN/GeoDourados. Ver LEIA-ME_INTEGRACAO.md.
 """
 import math
 import os
+import tempfile
 
 from qgis.core import *
 from qgis.PyQt.QtCore import Qt
@@ -65,6 +66,9 @@ def podar_legenda(raiz, visiveis, escala=None):
     def podar(g):
         for n in list(g.children()):
             if QgsLayerTree.isGroup(n):
+                if n.name().strip().lower() in ('pranchas', 'sigri pranchas'):
+                    g.removeChildNode(n)      # prévia das folhas (SIGRI) não entra na legenda
+                    continue
                 podar(n)
                 if not n.children():
                     g.removeChildNode(n)
@@ -191,12 +195,15 @@ def build(fmt, W, H, m, orient):
     rect(L, x0, y0, iw, ih, sw=0.7 if fmt in ('A0', 'A1') else 0.5, iid='Moldura externa')
 
     if orient == 'Paisagem':
-        P_w = round(iw * (0.25 if fmt in ('A0', 'A1') else 0.27), 1)
+        P_w = round(iw * (0.25 if fmt in ('A0', 'A1') else 0.32 if fmt in ('A3', 'A4') else 0.27), 1)
         px = x1 - P_w
         mx, my, mw, mh = x0 + g, y0 + g, px - x0 - 2 * g, ih - 2 * g
         Hp = ih
         fr = [('header', .09), ('title', .09), ('inset', .17), ('legend', None),
               ('scale', .11), ('carto', .12), ('credits', .15)]
+        if fmt in ('A3', 'A4'):      # folhas pequenas: mais espaço pra legenda
+            fr = [('header', .08), ('title', .08), ('inset', .13), ('legend', None),
+                  ('scale', .10), ('carto', .11), ('credits', .13)]
         used = sum(f for _, f in fr if f)
         cells = {}
         cy = y0
@@ -367,17 +374,37 @@ def build(fmt, W, H, m, orient):
     podar_legenda(leg.model().rootGroup(), VISIVEIS, mp.scale())
     leg.setLegendFilterByMapEnabled(True)
     leg.setResizeToContents(False)
-    leg.setColumnCount(2 if (orient == 'Paisagem' and fmt in ('A0', 'A1')) else 1)
     leg.setSplitLayer(True)
-    leg.setSymbolWidth(5 * k)
-    leg.setSymbolHeight(3 * k)
     leg.setBoxSpace(pad)
     leg.setWrapString('|')
-    leg.rstyle(QgsLegendStyle.Title).setTextFormat(tfmt(7.5 * k, True))
-    leg.rstyle(QgsLegendStyle.Group).setTextFormat(tfmt(6.5 * k, True))
-    leg.rstyle(QgsLegendStyle.Subgroup).setTextFormat(tfmt(6 * k, True))
-    leg.rstyle(QgsLegendStyle.SymbolLabel).setTextFormat(tfmt(5.5 * k))
     leg.setTitleAlignment(Qt.AlignHCenter)
+
+    def ajustar(f, colunas):
+        leg.setColumnCount(colunas)
+        leg.setSymbolWidth(5 * k * f)
+        leg.setSymbolHeight(3 * k * f)
+        leg.rstyle(QgsLegendStyle.Title).setTextFormat(tfmt(7.5 * k * f, True))
+        leg.rstyle(QgsLegendStyle.Group).setTextFormat(tfmt(6.5 * k * f, True))
+        leg.rstyle(QgsLegendStyle.Subgroup).setTextFormat(tfmt(6 * k * f, True))
+        leg.rstyle(QgsLegendStyle.SymbolLabel).setTextFormat(tfmt(5.5 * k * f))
+        leg.setResizeToContents(True)
+        # o tamanho real (já com o filtro pelo mapa) só é calculado quando o item é desenhado
+        cfg = QgsLayoutExporter.ImageExportSettings()
+        cfg.dpi = 15
+        QgsLayoutExporter(L).exportToImage(os.path.join(tempfile.gettempdir(), '_gd_leg_fit.png'), cfg)
+        return leg.rect().width() <= cw - pad and leg.rect().height() <= ch - pad
+
+    # a legenda tem que caber inteira na célula: reduz a fonte e, se preciso, usa mais colunas
+    colunas0 = 2 if (orient == 'Paisagem' and fmt in ('A0', 'A1')) else 1
+    coube = False
+    for f in (1.0, 0.9, 0.8, 0.7, 0.62, 0.55, 0.48):      # maior fonte que couber, com 1 a 3 colunas
+        for colunas in range(colunas0, 4):
+            if ajustar(f, colunas):
+                coube = True
+                break
+        if coube:
+            break
+    leg.setResizeToContents(False)
     place(leg, cx + pad * 0.5, cy + pad * 0.5, cw - pad, ch - pad)
     leg.refresh()
 
