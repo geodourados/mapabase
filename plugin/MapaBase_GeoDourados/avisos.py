@@ -46,6 +46,20 @@ levantamento topográfico/georreferenciado, projetos aprovados ou parecer técni
 <p>&bull; Antes de decisões que dependam de precisão (compra, construção, parcelamento),
 confirme a informação junto à Prefeitura e nos documentos oficiais.</p>
 
+<h4>Desenvolvimento do plugin</h4>
+<div class="box">
+  <b>Ênio Alencar da Silva</b> — Geógrafo<br>
+  Núcleo de Inteligência Geográfica<br>
+  Departamento de Geoprocessamento<br>
+  Secretaria Municipal de Planejamento (SEPLAN)<br>
+  Prefeitura Municipal de Dourados-MS<br>
+  E-mail: <a href="mailto:enio.silva@dourados.ms.gov.br">enio.silva@dourados.ms.gov.br</a><br>
+  GeoDourados: <a href="mailto:geodourados@dourados.ms.gov.br">geodourados@dourados.ms.gov.br</a><br>
+  GeoPortal: <a href="https://geoportal.dourados.ms.gov.br/portal/apps/sites/#/home/">geoportal.dourados.ms.gov.br</a><br>
+  Código e atualizações: <a href="https://github.com/geodourados/mapabase">github.com/geodourados/mapabase</a><br>
+  Versão do plugin: <b>@VERSAO@</b>
+</div>
+
 <h4>Responsabilidade</h4>
 <p>Os dados são de responsabilidade da Secretaria Municipal de Planejamento de Dourados-MS
 (Departamento de Geoprocessamento). Este plugin atua apenas como meio de distribuição
@@ -55,12 +69,17 @@ técnica e não coleta nem transmite dados pessoais.</p>
 
 def mostrar_aviso_dados(parent=None):
     dlg = QDialog(parent)
-    dlg.setWindowTitle("Sobre os dados e termos de uso")
+    dlg.setWindowTitle("Sobre o plugin, os dados e termos de uso")
     dlg.resize(520, 520)
     lay = QVBoxLayout(dlg)
     navegador = QTextBrowser()
     navegador.setOpenExternalLinks(True)
-    navegador.setHtml(AVISO_HTML)
+    try:
+        from .sync import versao_plugin_local
+        versao = versao_plugin_local() or "?"
+    except Exception:
+        versao = "?"
+    navegador.setHtml(AVISO_HTML.replace("@VERSAO@", versao))
     lay.addWidget(navegador)
     btn = QPushButton("Entendi")
     btn.setFixedHeight(28)

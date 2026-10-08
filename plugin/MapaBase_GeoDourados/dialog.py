@@ -704,7 +704,7 @@ class MapaBaseDialog(QWidget):
             pm.addLayout(grade)
 
         pm.addWidget(linha_h())
-        btn_sobre = QPushButton("ℹ  Sobre os dados e termos de uso")
+        btn_sobre = QPushButton("ℹ  Sobre o plugin, os dados e termos de uso")
         btn_sobre.setFixedHeight(26)
         btn_sobre.clicked.connect(self._on_sobre_dados)
         pm.addWidget(btn_sobre)
@@ -719,7 +719,7 @@ class MapaBaseDialog(QWidget):
         lbl_aviso.setStyleSheet("font-size:9px;color:#2d3748;")
         rod.addWidget(lbl_aviso, 1)
         b_info = QPushButton(f"ℹ  v{versao}" if versao else "ℹ")
-        b_info.setToolTip(f"Versão {versao} do plugin. Clique para ver: sobre os dados e termos de uso."
+        b_info.setToolTip(f"Versão {versao} do plugin. Clique para ver: sobre o plugin, o desenvolvedor, os dados e os termos de uso."
                           if versao else "Sobre os dados e termos de uso")
         b_info.setFixedHeight(24)
         b_info.clicked.connect(self._on_sobre_dados)
