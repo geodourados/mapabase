@@ -194,6 +194,7 @@ class MapaBaseDialog(QWidget):
         def titulo_secao(texto):
             lb = QLabel(texto)
             lb.setStyleSheet("font-weight:bold;font-size:10px;color:#1a365d;")
+            lb.setProperty("fonte_uniforme", True)
             return lb
 
         def linha_h():
@@ -209,6 +210,7 @@ class MapaBaseDialog(QWidget):
         sl.setContentsMargins(4, 2, 4, 2)
         self.lbl_status = QLabel("Verificando...")
         self.lbl_status.setStyleSheet("font-size:10px;")
+        self.lbl_status.setProperty("fonte_uniforme", True)
         self.lbl_status.setWordWrap(True)
         sl.addWidget(self.lbl_status)
         pb.addWidget(self.frm_status)
@@ -220,6 +222,7 @@ class MapaBaseDialog(QWidget):
         self.lbl_plugin = QLabel("")
         self.lbl_plugin.setWordWrap(True)
         self.lbl_plugin.setStyleSheet("font-size:10px;border:none;background:transparent;")
+        self.lbl_plugin.setProperty("fonte_uniforme", True)
         pl.addWidget(self.lbl_plugin)
         self.btn_atualizar_plugin = QPushButton("⬆  Atualizar plugin")
         self.btn_atualizar_plugin.setFixedHeight(24)
@@ -407,6 +410,7 @@ class MapaBaseDialog(QWidget):
         self._aba_atributos = self.tabs.count() - 1
         self.lbl_attr = QLabel("")
         self.lbl_attr.setStyleSheet("font-size:10px;font-weight:bold;color:#1a365d;")
+        self.lbl_attr.setProperty("fonte_uniforme", True)
         self.lbl_attr.setWordWrap(True)
         pa.addWidget(self.lbl_attr)
         nav = QHBoxLayout()
@@ -478,6 +482,7 @@ class MapaBaseDialog(QWidget):
             linha_w = QHBoxLayout()
             tx = QLabel("<b>%s</b><br><span style='color:#666'>%s</span>" % (serv["nome"], serv["descricao"]))
             tx.setStyleSheet("font-size:9px;")
+            tx.setProperty("fonte_uniforme", True)
             tx.setWordWrap(True)
             linha_w.addWidget(tx, 1)
             bw = QPushButton("Adicionar")
@@ -536,6 +541,7 @@ class MapaBaseDialog(QWidget):
         self.lbl_cep = QLabel("")
         self.lbl_cep.setWordWrap(True)
         self.lbl_cep.setStyleSheet("font-size:9px;")
+        self.lbl_cep.setProperty("fonte_uniforme", True)
         pm.addWidget(self.lbl_cep)
         lv = QHBoxLayout()
         b_cnm = QPushButton("🔎  Validador de CNM (ONR)")
@@ -587,27 +593,44 @@ class MapaBaseDialog(QWidget):
         rod.addWidget(b_info)
         corpo.addLayout(rod)
 
-        self._aumentar_fonte_botoes(self.conteudo)
+        self._uniformizar_fontes(self.conteudo)
         self.scroll.setWidget(self.conteudo)
         main.addWidget(self.scroll, 1)
         main.addStretch(0)
 
-    @staticmethod
-    def _aumentar_fonte_botoes(raiz, passo=1):
-        """Todos os botões do painel (menos os de ícone do cabeçalho) com a fonte 1 ponto maior."""
+    def _uniformizar_fontes(self, raiz):
+        """Mesmo tamanho de texto em botões, abas, campos, caixas e títulos; só os textos de
+        informação (cinza, tamanho 9px) e o rodapé ficam menores."""
         import re
-        for btn in raiz.findChildren(QPushButton):
-            css = btn.styleSheet()
-            if "17px" in css:
+        from qgis.PyQt.QtWidgets import QLabel as _L
+        uni = f"{self._pt + 1:g}pt"
+
+        def aplicar(w):
+            css = re.sub(r"font-size:\s*[\d.]+(px|pt);?", "", w.styleSheet())
+            w.setStyleSheet((css + ("" if css.endswith(";") or not css else ";") + f"font-size:{uni};")
+                            if not isinstance(w, QPushButton) or "background" not in css else css)
+            if isinstance(w, QPushButton) and "background" in css:
+                f = w.font()
+                f.setPointSizeF(self._pt + 1)
+                w.setFont(f)
+        for w in raiz.findChildren(QPushButton):
+            if "17px" in w.styleSheet():
                 continue
-            if re.search(r"font-size:\s*\d+px", css):
-                btn.setStyleSheet(re.sub(r"font-size:\s*(\d+)px", lambda m: f"font-size:{int(m.group(1)) + 1}px", css))
-            else:
-                f = btn.font()
-                f.setPointSizeF((f.pointSizeF() if f.pointSizeF() > 0 else 9.0) + passo)
-                btn.setFont(f)
-            if btn.minimumHeight() == btn.maximumHeight() > 0:
-                btn.setFixedHeight(btn.height() + 2 if btn.height() > 0 else btn.maximumHeight() + 2)
+            aplicar(w)
+        for tipo in (QCheckBox, QComboBox, QLineEdit):
+            for w in raiz.findChildren(tipo):
+                aplicar(w)
+        for w in raiz.findChildren(_L):
+            if w.property("fonte_uniforme"):
+                aplicar(w)
+        self.tabs.setStyleSheet(
+            "QTabBar::tab{padding:4px 6px;}"
+            "QTabBar::tab:selected{color:#1a365d;background:#ffffff;}")
+        _ft = self.tabs.tabBar().font()
+        _ft.setPointSizeF(self._pt + 1)
+        self.tabs.tabBar().setFont(_ft)
+        self.tabs.tabBar().setElideMode(Qt.ElideNone)
+        self.tabs.tabBar().setUsesScrollButtons(False)
 
     # ── Status ───────────────────────────────────────────────────────────
     def atualizar_status(self):
