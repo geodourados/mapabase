@@ -388,6 +388,18 @@ class MapaBaseDialog(QWidget):
         self.btn_croqui_tela.clicked.connect(lambda: self._on_gerar_croqui(None))
         linha_croqui_botoes.addWidget(self.btn_croqui_tela)
         pq.addLayout(linha_croqui_botoes)
+
+        pq.addWidget(linha_h())
+        pq.addWidget(titulo_secao("Layouts de impressão (ABNT, A0 a A4)"))
+        info_lay = QLabel("Cria 7 layouts (A0–A4 paisagem; A3 e A4 retrato) com a área visível da tela, "
+                          "quadrícula, legenda, norte e escala. Depois: Projeto › Gerenciador de layouts.")
+        info_lay.setWordWrap(True)
+        info_lay.setStyleSheet("font-size:9px;color:#666;")
+        pq.addWidget(info_lay)
+        b_lay = QPushButton("🖨  Gerar layouts ABNT")
+        b_lay.setFixedHeight(25)
+        b_lay.clicked.connect(self._on_gerar_layouts)
+        pq.addWidget(b_lay)
         pq.addStretch()
 
         # ── Aba ATRIBUTOS ────────────────────────────────────────────────
@@ -492,18 +504,6 @@ class MapaBaseDialog(QWidget):
         area_mais.setWidget(cont_mais)
         self.tabs.addTab(area_mais, "Mais")
 
-        pm.addWidget(titulo_secao("Layouts de impressão (ABNT, A0 a A4)"))
-        info_lay = QLabel("Cria 7 layouts (A0–A4 paisagem; A3 e A4 retrato) na área visível da tela, com "
-                          "quadrícula, legenda, norte e escala. Depois: Projeto › Gerenciador de layouts.")
-        info_lay.setWordWrap(True)
-        info_lay.setStyleSheet("font-size:9px;color:#666;")
-        pm.addWidget(info_lay)
-        b_lay = QPushButton("🖨  Gerar layouts ABNT")
-        b_lay.setFixedHeight(26)
-        b_lay.clicked.connect(self._on_gerar_layouts)
-        pm.addWidget(b_lay)
-
-        pm.addWidget(linha_h())
         pm.addWidget(titulo_secao("Validadores"))
         lc = QHBoxLayout()
         lc.setSpacing(3)
@@ -517,6 +517,22 @@ class MapaBaseDialog(QWidget):
         b_cep.clicked.connect(self._on_validar_cep)
         lc.addWidget(b_cep)
         pm.addLayout(lc)
+        lc2 = QHBoxLayout()
+        lc2.setSpacing(3)
+        b_eixo = QPushButton("🖱  CEP do eixo viário (clicar)")
+        b_eixo.setFixedHeight(24)
+        b_eixo.setStyleSheet("font-size:9px;")
+        b_eixo.setToolTip("Não sabe o CEP? Clique aqui e depois numa rua no mapa: o CEP do eixo viário "
+                          "é preenchido e validado. Botão direito cancela.")
+        b_eixo.clicked.connect(self._on_cep_do_eixo)
+        lc2.addWidget(b_eixo)
+        b_lote = QPushButton("🏠  CEP da frente do lote")
+        b_lote.setFixedHeight(24)
+        b_lote.setStyleSheet("font-size:9px;")
+        b_lote.setToolTip("Com um lote selecionado: acha a(s) rua(s) em frente a ele, pega o CEP e valida.")
+        b_lote.clicked.connect(self._on_cep_do_lote)
+        lc2.addWidget(b_lote)
+        pm.addLayout(lc2)
         self.lbl_cep = QLabel("")
         self.lbl_cep.setWordWrap(True)
         self.lbl_cep.setStyleSheet("font-size:9px;")
@@ -1130,19 +1146,91 @@ class MapaBaseDialog(QWidget):
         self.iface.messageBar().pushSuccess(
             "Mapa Base", f"{len(res)} layouts ABNT criados/atualizados — veja em Projeto › Gerenciador de layouts.")
 
+    _cep_prefixo = ""
+
     def _on_validar_cep(self):
+        self._validar_cep(self.txt_cep.text(), "")
+
+    def _validar_cep(self, texto, prefixo):
         from qgis.core import QgsProject
         from . import cep
-        cep8 = cep.normalizar(self.txt_cep.text())
+        cep8 = cep.normalizar(texto)
         if not cep8:
-            self.lbl_cep.setText("❌ CEP inválido: informe os 8 dígitos (ex.: 79822-720).")
+            self.lbl_cep.setText(prefixo + "❌ CEP inválido: informe os 8 dígitos (ex.: 79822-720).")
             return
         self._cep_atual = cep8
+        self._cep_prefixo = prefixo
         self._cep_local = cep.buscar_local(QgsProject.instance(), cep8)
-        self.lbl_cep.setText("Consultando os Correios...")
+        self.lbl_cep.setText(prefixo + "Consultando os Correios...")
         self._cep_worker = CepWorker(cep8)
         self._cep_worker.pronto.connect(self._on_cep_pronto)
         self._cep_worker.start()
+
+    def _on_cep_do_eixo(self):
+        from .ferramentas import FerramentaClique
+        canvas = self.iface.mapCanvas()
+        self._ferr_anterior = canvas.mapTool()
+        self._ferr_cep = FerramentaClique(canvas, self._ao_clicar_eixo)
+        canvas.setMapTool(self._ferr_cep)
+        self.lbl_cep.setText("🖱 Clique sobre uma rua (eixo viário) no mapa. Botão direito cancela.")
+
+    def _ao_clicar_eixo(self, ponto):
+        from qgis.core import QgsGeometry, QgsProject
+        from . import cep
+        canvas = self.iface.mapCanvas()
+        # devolve a ferramenta que estava em uso
+        if getattr(self, "_ferr_anterior", None) is not None:
+            canvas.setMapTool(self._ferr_anterior)
+        else:
+            canvas.unsetMapTool(self._ferr_cep)
+        if ponto is None:
+            self.lbl_cep.setText("Cancelado.")
+            return
+        # 12 pixels, mas nunca menos de ~10 m: o usuário clica na pista, não exatamente no eixo.
+        geografico = canvas.mapSettings().destinationCrs().isGeographic()
+        tolerancia = max(canvas.mapUnitsPerPixel() * 12, 0.0001 if geografico else 10.0)
+        achado = cep.eixo_no_ponto(QgsProject.instance(), QgsGeometry.fromPointXY(ponto),
+                                   canvas.mapSettings().destinationCrs(), tolerancia)
+        if achado is None:
+            self.lbl_cep.setText("⚠ Nenhum eixo viário perto do clique. Aproxime o zoom e clique sobre a rua.")
+            return
+        canvas.flashGeometries([achado["geom"]], achado["crs"])
+        if not achado["cep8"]:
+            self.lbl_cep.setText(f"⚠ {achado['nome']}: este trecho não tem CEP cadastrado na base.")
+            return
+        self.txt_cep.setText(cep.formatar(achado["cep8"]))
+        self._validar_cep(achado["cep8"], f"🛣 {achado['nome']} (eixo clicado)\n")
+
+    def _on_cep_do_lote(self):
+        from qgis.core import QgsProject
+        from . import cep
+        from .camadas import camadas_principais
+        lotes = camadas_principais(QgsProject.instance())["lotes"]
+        if lotes is None:
+            self.lbl_cep.setText("⚠ Camada de lotes não encontrada no projeto aberto.")
+            return
+        sel = lotes.selectedFeatures()
+        if len(sel) != 1:
+            self.lbl_cep.setText("⚠ Selecione exatamente 1 lote (aba Buscar ou F4) e clique de novo.")
+            return
+        frentes = cep.eixos_da_frente(QgsProject.instance(), sel[0].geometry(), lotes.crs())
+        if not frentes:
+            self.lbl_cep.setText("⚠ Não encontrei eixo viário perto desse lote.")
+            return
+        self.iface.mapCanvas().flashGeometries([f["geom"] for f in frentes], frentes[0]["crs"])
+        linhas = ["🏠 Frente do lote:"]
+        for f in frentes:
+            linhas.append(f"   • {f['nome']} — CEP {cep.formatar(f['cep8']) if f['cep8'] else 'não cadastrado'}"
+                          f" ({f['distancia']:.0f} m)")
+        com_cep = [f for f in frentes if f["cep8"]]
+        prefixo = "\n".join(linhas) + "\n"
+        if not com_cep:
+            self.lbl_cep.setText(prefixo + "⚠ Nenhum dos trechos tem CEP cadastrado.")
+            return
+        if len(com_cep) > 1:
+            prefixo += "(lote de esquina: validando o CEP do trecho mais próximo)\n"
+        self.txt_cep.setText(cep.formatar(com_cep[0]["cep8"]))
+        self._validar_cep(com_cep[0]["cep8"], prefixo)
 
     def _on_cep_pronto(self, dados, erro):
         from . import cep
@@ -1163,7 +1251,7 @@ class MapaBaseDialog(QWidget):
             linhas.append(f"✅ Correios: {fmt}" + (f" — {end}" if end else "") + f" — {cidade}")
             if (dados.get("localidade") or "").strip().lower() != "dourados":
                 linhas.append("⚠ Atenção: este CEP não é de Dourados.")
-        self.lbl_cep.setText("\n".join(linhas))
+        self.lbl_cep.setText(self._cep_prefixo + "\n".join(linhas))
 
     # ── Croqui ───────────────────────────────────────────────────────────
     def _on_gerar_croqui(self, escala_fixa):

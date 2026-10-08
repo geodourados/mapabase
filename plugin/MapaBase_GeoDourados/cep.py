@@ -42,3 +42,91 @@ def consultar_correios(cep8):
     with urllib.request.urlopen(req, timeout=8) as r:
         dados = json.load(r)
     return None if dados.get("erro") else dados
+
+
+# ── CEP a partir do mapa (eixo viário clicado / frente do lote) ──────────────
+def _cep_do_valor(valor):
+    if valor is None or str(valor) in ("", "NULL"):
+        return None
+    return normalizar(str(valor))
+
+
+def _nome_eixo(layer, feat):
+    for campo in ("nome_logradouro", "nome"):
+        if layer.fields().indexOf(campo) >= 0 and feat[campo] not in (None, "") and str(feat[campo]) != "NULL":
+            return str(feat[campo]).strip()
+    return "(sem nome)"
+
+
+def _para_crs(geom_ou_pt, crs_origem, crs_destino, project):
+    from qgis.core import QgsCoordinateTransform, QgsGeometry
+    if crs_origem == crs_destino:
+        return geom_ou_pt
+    tr = QgsCoordinateTransform(crs_origem, crs_destino, project)
+    g = QgsGeometry(geom_ou_pt)
+    g.transform(tr)
+    return g
+
+
+def eixo_no_ponto(project, ponto_geom, crs_ponto, tolerancia):
+    """Eixo viário mais próximo do ponto clicado (QgsGeometry de ponto em crs_ponto),
+    dentro da tolerância (unidades do crs_ponto). Retorna dict ou None."""
+    from qgis.core import QgsFeatureRequest
+    layer = camadas_principais(project)["logradouros"]
+    if layer is None:
+        return None
+    pt = _para_crs(ponto_geom, crs_ponto, layer.crs(), project)
+    p = pt.asPoint()
+    # tolerância na unidade da camada (mesma unidade nos CRS usados aqui; se mudar, margem generosa)
+    rect = pt.buffer(tolerancia, 4).boundingBox()
+    melhor = None
+    for f in layer.getFeatures(QgsFeatureRequest().setFilterRect(rect)):
+        if f.geometry().isNull():
+            continue
+        dist = f.geometry().distance(pt)
+        if dist <= tolerancia and (melhor is None or dist < melhor["distancia"]):
+            melhor = {"nome": _nome_eixo(layer, f), "cep8": _cep_do_valor(f["cep"]) if layer.fields().indexOf("cep") >= 0 else None,
+                      "distancia": dist, "geom": QgsGeometry_copia(f.geometry()), "crs": layer.crs()}
+    return melhor
+
+
+def QgsGeometry_copia(g):
+    from qgis.core import QgsGeometry
+    return QgsGeometry(g)
+
+
+def eixos_da_frente(project, geom_lote, crs_lote, folga=6.0):
+    """Eixos viários que fazem frente ao lote: o mais próximo e os que estão a até `folga`
+    metros dele (lote de esquina tem duas frentes). Lista de dicts ordenada por distância."""
+    from qgis.core import QgsFeatureRequest
+    layer = camadas_principais(project)["logradouros"]
+    if layer is None:
+        return []
+    lote = _para_crs(geom_lote, crs_lote, layer.crs(), project)
+    achados = []
+    for raio in (60, 150, 400):
+        rect = lote.boundingBox()
+        rect.grow(raio)
+        achados = []
+        for f in layer.getFeatures(QgsFeatureRequest().setFilterRect(rect)):
+            if f.geometry().isNull():
+                continue
+            achados.append({"nome": _nome_eixo(layer, f),
+                            "cep8": _cep_do_valor(f["cep"]) if layer.fields().indexOf("cep") >= 0 else None,
+                            "distancia": f.geometry().distance(lote),
+                            "geom": QgsGeometry_copia(f.geometry()), "crs": layer.crs()})
+        if achados:
+            break
+    achados.sort(key=lambda r: r["distancia"])
+    if not achados:
+        return []
+    corte = achados[0]["distancia"] + folga
+    vistos, saida = set(), []
+    for r in achados:
+        if r["distancia"] > corte:
+            break
+        chave = (r["nome"], r["cep8"])
+        if chave not in vistos:
+            vistos.add(chave)
+            saida.append(r)
+    return saida
