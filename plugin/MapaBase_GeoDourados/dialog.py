@@ -27,6 +27,28 @@ class CepWorker(QThread):
             self.pronto.emit(None, str(e) or "erro")
 
 
+class ComplementoWorker(QThread):
+    """Baixa o Complemento (.qlr + .gpkg)."""
+    progress = pyqtSignal(int, str)
+    finished = pyqtSignal(bool, str)
+
+    def run(self):
+        from . import complemento
+        ok, err = complemento.baixar(progress_callback=lambda v, m: self.progress.emit(v, m))
+        self.finished.emit(ok, err)
+
+
+class ComplementoStatusWorker(QThread):
+    pronto = pyqtSignal(str, str)
+
+    def run(self):
+        from . import complemento
+        try:
+            self.pronto.emit(*complemento.verificar())
+        except Exception as e:
+            self.pronto.emit("sem_rede", str(e))
+
+
 class DownloadWorker(QThread):
     progress = pyqtSignal(int, str)
     finished = pyqtSignal(bool, str)
@@ -514,6 +536,53 @@ class MapaBaseDialog(QWidget):
         pw.addWidget(self.lbl_wms)
         pw.addStretch()
 
+        # ── Aba COMPLEMENTO (IBGE e rural; GeoPackage separado da base oficial) ──
+        pc = pagina("Complemento")
+        self._aba_complemento = self.tabs.count() - 1
+        pc.addWidget(titulo_secao("Complemento – IBGE e Rural"))
+        info_comp = QLabel(
+            "Dados externos recortados para Dourados e municípios vizinhos, num arquivo separado da base oficial "
+            "(~260 MB): IBGE (Censo 2022, CNEFE, setores, trajetos, Censo Agro 2017), CAR, INCRA, FUNAI, embargos, "
+            "VTN e módulo fiscal, mais serviços online (CAR, FUNAI, IBGE BDiA, INPE, ANA, ANM, EPE e satélite).")
+        info_comp.setWordWrap(True)
+        info_comp.setStyleSheet("font-size:9px;color:#666;")
+        pc.addWidget(info_comp)
+        self.lbl_comp_status = QLabel("Verificando...")
+        self.lbl_comp_status.setWordWrap(True)
+        self.lbl_comp_status.setProperty("fonte_uniforme", True)
+        pc.addWidget(self.lbl_comp_status)
+        self.btn_comp_baixar = QPushButton("⬇  Baixar / atualizar o Complemento")
+        self.btn_comp_baixar.setFixedHeight(28)
+        estilizar_botao_azul(self.btn_comp_baixar)
+        self.btn_comp_baixar.clicked.connect(self._on_complemento_baixar)
+        pc.addWidget(self.btn_comp_baixar)
+        self.prog_comp = QProgressBar()
+        self.prog_comp.setVisible(False)
+        pc.addWidget(self.prog_comp)
+        self.lbl_comp_prog = QLabel("")
+        self.lbl_comp_prog.setStyleSheet("font-size:9px;color:#555;")
+        pc.addWidget(self.lbl_comp_prog)
+        self.btn_comp_add = QPushButton("🗂  Adicionar as camadas ao projeto aberto")
+        self.btn_comp_add.setFixedHeight(28)
+        self.btn_comp_add.setToolTip("Cria o grupo \"Complemento – IBGE e Rural\" com as camadas já estilizadas. "
+                                     "As camadas pesadas entram desligadas.")
+        self.btn_comp_add.clicked.connect(self._on_complemento_adicionar)
+        pc.addWidget(self.btn_comp_add)
+        self.lbl_comp_msg = QLabel("")
+        self.lbl_comp_msg.setWordWrap(True)
+        self.lbl_comp_msg.setStyleSheet("font-size:9px;color:#555;")
+        pc.addWidget(self.lbl_comp_msg)
+        pc.addWidget(linha_h())
+        lic = QLabel(
+            "Fontes: IBGE; SICAR/Serviço Florestal Brasileiro; INCRA; FUNAI; IBAMA; Receita Federal. Dados pessoais "
+            "(proprietários, CPF/CNPJ, responsáveis técnicos) não fazem parte do pacote. Imagem de satélite EOX "
+            "Sentinel-2 cloudless: CC BY-NC-SA 4.0 (uso não comercial) – © EOX IT Services GmbH, contém dados "
+            "Copernicus Sentinel modificados 2023. Esri World Imagery: © Esri, Maxar, Earthstar Geographics.")
+        lic.setWordWrap(True)
+        lic.setStyleSheet("font-size:9px;color:#666;")
+        pc.addWidget(lic)
+        pc.addStretch()
+
         # ── Aba MAIS (rolável) ───────────────────────────────────────────
         from .atalhos import GRUPOS, URL_VALIDADOR_CNM, URL_CORREIOS_CEP
         area_mais = QScrollArea()
@@ -953,6 +1022,8 @@ class MapaBaseDialog(QWidget):
             self._carregar_atributos()
         elif indice == getattr(self, "_aba_wms", -1):
             self._atualizar_wms()
+        elif indice == getattr(self, "_aba_complemento", -1):
+            self._atualizar_complemento()
 
     def _on_camada_ativa_mudou(self, *args):
         if self.tabs.currentIndex() == self._indice_aba_atributos():
@@ -1160,6 +1231,55 @@ class MapaBaseDialog(QWidget):
             ja = camada_no_projeto(projeto, serv) is not None
             b.setText("✓ No projeto" if ja else "Adicionar")
             b.setEnabled(not ja)
+
+    def _atualizar_complemento(self):
+        from . import complemento
+        if complemento.instalado():
+            self.lbl_comp_status.setText("✅ Instalado em: " + complemento.pasta() + "\nVerificando atualização...")
+        else:
+            self.lbl_comp_status.setText("Não instalado. Baixe para usar as camadas offline.")
+        self.btn_comp_add.setEnabled(complemento.instalado())
+        self._st_comp = ComplementoStatusWorker()
+        self._st_comp.pronto.connect(self._on_complemento_status)
+        self._st_comp.start()
+
+    def _on_complemento_status(self, estado, msg):
+        from . import complemento
+        icone = {"ok": "✅", "atualizar": "🔄", "nao_instalado": "⬇", "sem_rede": "ℹ"}.get(estado, "")
+        extra = ("\n" + complemento.pasta()) if complemento.instalado() else ""
+        self.lbl_comp_status.setText(f"{icone} {msg}{extra}")
+        self.btn_comp_baixar.setText("⬇  Atualizar o Complemento" if estado == "atualizar" else
+                                     "⬇  Baixar o Complemento" if estado == "nao_instalado" else
+                                     "⬇  Baixar de novo o Complemento")
+
+    def _on_complemento_baixar(self):
+        self.btn_comp_baixar.setEnabled(False)
+        self.prog_comp.setVisible(True)
+        self.prog_comp.setValue(0)
+        self._w_comp = ComplementoWorker()
+        self._w_comp.progress.connect(lambda v, m: (self.prog_comp.setValue(v), self.lbl_comp_prog.setText(m)))
+        self._w_comp.finished.connect(self._on_complemento_baixado)
+        self._w_comp.start()
+
+    def _on_complemento_baixado(self, ok, erro):
+        self.btn_comp_baixar.setEnabled(True)
+        if not ok:
+            self.prog_comp.setValue(0)
+            QMessageBox.critical(self, "Erro no download do Complemento", erro)
+            return
+        self.prog_comp.setValue(100)
+        self.lbl_comp_prog.setText("✅ Concluído!")
+        self._atualizar_complemento()
+
+    def _on_complemento_adicionar(self):
+        from qgis.core import QgsProject
+        from . import complemento
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            ok, msg = complemento.adicionar_ao_projeto(QgsProject.instance())
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.lbl_comp_msg.setText(("✅ " if ok else "⚠ ") + msg)
 
     def _on_wms_adicionar(self, serv):
         from qgis.core import QgsProject

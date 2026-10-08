@@ -35,6 +35,19 @@ GRUPOS = [
         ("SIG-RI - Mapa ONR", "https://mapa.onr.org.br/"),
         ("IBGE Cidades", "https://www.ibge.gov.br/cidades-e-estados/ms/dourados.html"),
     ]),
+    ("Mapas do IBGE (Dourados)", [
+        ("Mapa municipal 2020 (PDF)",
+         "https://geoftp.ibge.gov.br/cartas_e_mapas/mapas_municipais/colecao_de_mapas_municipais/2020/MS/dourados/5003702_MM.pdf"),
+        ("Mapa municipal estatístico 2007 (PDF)",
+         "https://geoftp.ibge.gov.br/cartas_e_mapas/mapas_para_fins_de_levantamentos_estatisticos/"
+         "contagem_da_populacao_e_censo_agropecuario_2007/mapas_municipais_estatisticos/ms/dourados.pdf"),
+        ("Setores censitários – Censo 2022",
+         "https://geoftp.ibge.gov.br/cartas_e_mapas/mapas_para_fins_de_levantamentos_estatisticos/"
+         "censo_demografico_2022/mapas_e_descritivos_de_setores_censitarios/MS/5003702/"),
+        ("Mapa urbano estatístico – Censo 2022",
+         "https://geoftp.ibge.gov.br/cartas_e_mapas/mapas_para_fins_de_levantamentos_estatisticos/"
+         "censo_demografico_2022/mapas_urbanos_estatisticos/MS/dourados_5003702/"),
+    ]),
     ("Certidões (CAC)", [
         ("📄  CND (Certidão Negativa)", "https://cac.dourados.ms.gov.br/emissoes/documentos/certidao-negativa/imovel"),
         ("💰  Valor Venal", "https://cac.dourados.ms.gov.br/emissoes/documentos/certidao-venal"),
