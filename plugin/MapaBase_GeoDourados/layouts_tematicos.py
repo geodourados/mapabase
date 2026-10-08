@@ -324,10 +324,10 @@ def build(fmt, W, H, m, orient):
     gw = lh * 1100 / 1200       # proporção do logo GeoDourados
     pic(L, LOGO_BRASAO, cx + pad, cy + pad, bw, lh, 'Brasão de Dourados')
     pic(L, LOGO_GEO, cx + cw - pad - gw, cy + pad, gw, lh, 'Logo GeoDourados')
-    label(L, 'PREFEITURA MUNICIPAL\nDE DOURADOS – MS\n'
-             'Secretaria de Planejamento – SEPLAN\n'
-             'Depto. de Geoprocessamento',
-          cx + 2 * pad + bw, cy + pad, cw - 4 * pad - bw - gw, lh, 5.2 * k, True, Qt.AlignHCenter,
+    label(L, 'PREFEITURA MUNICIPAL DE DOURADOS – MS\n'
+             'Secretaria Municipal de Planejamento – SEPLAN\n'
+             'Departamento de Geoprocessamento',
+          cx + 2 * pad + bw, cy + pad, cw - 4 * pad - bw - gw, lh, min(5.2 * k, (cw - 4 * pad - bw - gw) / 10.5), True, Qt.AlignHCenter,
           Qt.AlignVCenter, 'Cabeçalho')
 
     # ---------------- Título ----------------
