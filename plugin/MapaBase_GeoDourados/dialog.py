@@ -587,9 +587,27 @@ class MapaBaseDialog(QWidget):
         rod.addWidget(b_info)
         corpo.addLayout(rod)
 
+        self._aumentar_fonte_botoes(self.conteudo)
         self.scroll.setWidget(self.conteudo)
         main.addWidget(self.scroll, 1)
         main.addStretch(0)
+
+    @staticmethod
+    def _aumentar_fonte_botoes(raiz, passo=1):
+        """Todos os botões do painel (menos os de ícone do cabeçalho) com a fonte 1 ponto maior."""
+        import re
+        for btn in raiz.findChildren(QPushButton):
+            css = btn.styleSheet()
+            if "17px" in css:
+                continue
+            if re.search(r"font-size:\s*\d+px", css):
+                btn.setStyleSheet(re.sub(r"font-size:\s*(\d+)px", lambda m: f"font-size:{int(m.group(1)) + 1}px", css))
+            else:
+                f = btn.font()
+                f.setPointSizeF((f.pointSizeF() if f.pointSizeF() > 0 else 9.0) + passo)
+                btn.setFont(f)
+            if btn.minimumHeight() == btn.maximumHeight() > 0:
+                btn.setFixedHeight(btn.height() + 2 if btn.height() > 0 else btn.maximumHeight() + 2)
 
     # ── Status ───────────────────────────────────────────────────────────
     def atualizar_status(self):
