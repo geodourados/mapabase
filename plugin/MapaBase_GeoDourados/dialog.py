@@ -394,12 +394,29 @@ class MapaBaseDialog(QWidget):
 
         pq.addWidget(linha_h())
         pq.addWidget(titulo_secao("Layouts de impressão (ABNT, A0 a A4)"))
-        info_lay = QLabel("Cria 7 layouts (A0–A4 paisagem; A3 e A4 retrato) com a área visível da tela, "
-                          "quadrícula, legenda (só o que aparece no mapa), norte e escala. O lote selecionado sai com contorno pontilhado. Depois: Projeto › Gerenciador de layouts.")
+        info_lay = QLabel("Clique no formato para gerar o PDF direto, com a área visível da tela, quadrícula, "
+                          "legenda (só o que aparece no mapa), norte e escala. O lote selecionado sai com contorno pontilhado.")
         info_lay.setWordWrap(True)
         info_lay.setStyleSheet("font-size:9px;color:#666;")
         pq.addWidget(info_lay)
-        b_lay = QPushButton("🖨  Gerar layouts ABNT")
+        from .layouts_tematicos import FORMATOS as _FMT
+        grade_lay = QGridLayout()
+        grade_lay.setSpacing(4)
+        linha_ret = QHBoxLayout()
+        linha_ret.setSpacing(4)
+        self.btns_layout_pdf = []
+        for i, (fmt, _w, _h, _m, orient) in enumerate(_FMT):
+            b = QPushButton(fmt if orient == "Paisagem" else f"{fmt} retrato")
+            b.setFixedHeight(25)
+            b.setMinimumWidth(10)
+            b.setToolTip(f"Gera o PDF do mapa em {fmt} {orient.lower()} (NBR 10068) e abre o arquivo.")
+            b.clicked.connect(lambda _=False, n=i: self._on_layout_pdf(n))
+            grade_lay.addWidget(b, 0, i) if orient == "Paisagem" else linha_ret.addWidget(b)
+            self.btns_layout_pdf.append(b)
+        pq.addLayout(grade_lay)
+        pq.addLayout(linha_ret)
+        b_lay = QPushButton("🖨  Criar os 7 layouts no projeto (editáveis)")
+        b_lay.setToolTip("Não gera PDF: cria os layouts no projeto para você ajustar em Projeto › Gerenciador de layouts.")
         b_lay.setFixedHeight(25)
         b_lay.clicked.connect(self._on_gerar_layouts)
         pq.addWidget(b_lay)
@@ -1154,6 +1171,52 @@ class MapaBaseDialog(QWidget):
             QApplication.restoreOverrideCursor()
         self.lbl_wms.setText(("✅ " if ok else "⚠ ") + msg)
         self._atualizar_wms()
+
+    def _variaveis_layouts(self, projeto):
+        """O módulo grava o responsável técnico (nome/CREA/ART) como variáveis do projeto e imprime
+        no carimbo. Só o projeto Fonte (banco) usa os dados padrão do autor; nos demais fica em
+        branco, pro usuário preencher em Projeto › Propriedades › Variáveis."""
+        from qgis.core import QgsExpressionContextUtils
+        from .camadas import camadas_principais
+        lotes = camadas_principais(projeto)["lotes"]
+        eh_fonte = lotes is not None and lotes.providerType() == "postgres"
+        if not eh_fonte and not QgsExpressionContextUtils.projectScope(projeto).hasVariable("rt_nome"):
+            return {"rt_nome": "", "rt_titulo": "", "rt_registro": "", "rt_art": "",
+                    "contato": "geodourados@dourados.ms.gov.br"}
+        return None
+
+    def _on_layout_pdf(self, indice):
+        """Gera o layout do formato escolhido, exporta o PDF e remove o layout provisório do projeto."""
+        import re
+        import time
+        from qgis.core import QgsProject, QgsLayoutExporter
+        from . import layouts_tematicos as lt
+        projeto = QgsProject.instance()
+        formato = lt.FORMATOS[indice]
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        layout = None
+        try:
+            res = lt.criar_layouts(self.iface.mapCanvas().extent(), projeto=projeto,
+                                   variaveis=self._variaveis_layouts(projeto), formatos=[formato])
+            layout = projeto.layoutManager().layoutByName(res[0][0])
+            pasta = os.path.join(os.path.expanduser("~"), "Downloads", "GeoDourados - Mapas")
+            os.makedirs(pasta, exist_ok=True)
+            nome = re.sub(r"\W+", "_", f"Mapa_{formato[0]}_{formato[4]}_{time.strftime('%Y%m%d_%H%M%S')}")
+            destino = os.path.join(pasta, nome + ".pdf")
+            cfg = QgsLayoutExporter.PdfExportSettings()
+            cfg.dpi = 200
+            ok = QgsLayoutExporter(layout).exportToPdf(destino, cfg) == QgsLayoutExporter.Success
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Não foi possível gerar o mapa", str(e))
+            ok, destino = False, ""
+        else:
+            QApplication.restoreOverrideCursor()
+        finally:
+            lt.limpar_temporarios(projeto, layout)
+        if ok:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(destino))
+            self.iface.messageBar().pushSuccess("Mapa Base", f"Mapa {formato[0]} {formato[4].lower()} gerado: {destino}")
 
     def _on_gerar_layouts(self):
         from qgis.core import QgsProject, QgsExpressionContextUtils

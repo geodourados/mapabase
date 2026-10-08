@@ -527,3 +527,18 @@ def criar_layouts(extensao, projeto=None, pasta_logos=None, formatos=None, varia
     VISIVEIS = criar_tema()
     DESTAQUE = _preparar_destaque()
     return [build(*f) for f in (formatos or FORMATOS)]
+
+
+def limpar_temporarios(projeto, layout=None):
+    """Remove o layout provisório, o tema de impressão e a camada de destaque (uso do botão de PDF direto)."""
+    global DESTAQUE
+    try:
+        if layout is not None:
+            projeto.layoutManager().removeLayout(layout)
+        mt = projeto.mapThemeCollection()
+        if mt.hasMapTheme(TEMA):
+            mt.removeMapTheme(TEMA)
+        for c in projeto.mapLayersByName(NOME_DESTAQUE):
+            projeto.removeMapLayer(c.id())
+    finally:
+        DESTAQUE = None
