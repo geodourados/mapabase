@@ -58,6 +58,38 @@ def resolver_layer_lotes(project):
     return resolver_layer(project, TABELA_LOTES)
 
 
+COR_DESTAQUE = "#e6007e"
+
+
+def _camada_destaque(layer_lotes, feat):
+    """Camada temporária (em memória) só com o lote selecionado, desenhada com contorno
+    PONTILHADO por cima de um traço branco largo — o lote sai destacado no PDF sem
+    mexer no estilo da camada de lotes. Retorna None se algo falhar."""
+    try:
+        from qgis.core import (QgsFeature, QgsFillSymbol, QgsGeometry, QgsSimpleFillSymbolLayer,
+                               QgsVectorLayer, QgsWkbTypes)
+        geom = QgsGeometry(feat.geometry())
+        if geom.isNull():
+            return None
+        tipo = QgsWkbTypes.displayString(QgsWkbTypes.flatType(geom.wkbType())) or "MultiPolygon"
+        tmp = QgsVectorLayer(f"{tipo}?crs={layer_lotes.crs().authid()}", "Lote selecionado (destaque)", "memory")
+        if not tmp.isValid():
+            return None
+        f = QgsFeature(tmp.fields())
+        f.setGeometry(geom)
+        tmp.dataProvider().addFeatures([f])
+        simbolo = QgsFillSymbol.createSimple({
+            "color": "0,0,0,0", "outline_color": "#ffffff", "outline_width": "1.5", "outline_width_unit": "MM"})
+        pontilhado = QgsSimpleFillSymbolLayer.create({
+            "color": "0,0,0,0", "outline_color": COR_DESTAQUE, "outline_width": "0.75",
+            "outline_width_unit": "MM", "outline_style": "dot"})
+        simbolo.appendSymbolLayer(pontilhado)
+        tmp.renderer().setSymbol(simbolo)
+        return tmp
+    except Exception:
+        return None
+
+
 VARIAVEIS_CROQUI = ("estacao_ip", "base_atualizada_em", "lote_alvo")
 
 
@@ -129,13 +161,18 @@ def gerar_croqui(iface, gpkg_path, escala_fixa=1000):
     atlas.setFilterFeatures(True)
     atlas.setFilterExpression('"id" = @lote_alvo')
 
-    mapitem = None
-    if escala_fixa is None:
-        itens_mapa = [it for it in layout.items() if isinstance(it, QgsLayoutItemMap)]
-        if itens_mapa:
-            mapitem = itens_mapa[0]
+    itens_mapa = [it for it in layout.items() if isinstance(it, QgsLayoutItemMap)]
+    mapitem = itens_mapa[0] if itens_mapa else None
 
     escala_anterior = mapitem.scale() if mapitem is not None else None
+    # Destaque do lote: o mapa passa a usar as camadas da tela + a camada temporária no topo
+    # (restaurado no finally).
+    destaque = _camada_destaque(layer_lotes, feat)
+    keep_set_anterior = mapitem.keepLayerSet() if mapitem is not None else False
+    if destaque is not None and mapitem is not None:
+        mapitem.setKeepLayerSet(True)
+        mapitem.setLayers([destaque] + list(iface.mapCanvas().layers()))
+        mapitem.invalidateCache()
     atlas.beginRender()
     try:
         if atlas.count() != 1:
@@ -174,8 +211,12 @@ def gerar_croqui(iface, gpkg_path, escala_fixa=1000):
             return True, f"Croqui gerado (1:{escala}): {destino}"
         return False, f"Falha ao exportar o croqui (código {resultado})."
     finally:
-        if mapitem is not None and escala_anterior is not None:
+        if mapitem is not None and escala_anterior is not None and escala_fixa is None:
             mapitem.setScale(escala_anterior)
+        if mapitem is not None and destaque is not None:
+            mapitem.setKeepLayerSet(keep_set_anterior)
+            mapitem.setLayers([])
+            mapitem.invalidateCache()
         atlas.endRender()
         # Não deixa rastro no projeto: as variáveis (IP da estação, lote) são só pra
         # renderizar o PDF e, se ficassem, seriam salvas no .qgs e até publicadas.

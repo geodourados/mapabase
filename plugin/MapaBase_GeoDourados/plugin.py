@@ -1,7 +1,7 @@
 import os
 
 from qgis.core import Qgis
-from qgis.PyQt.QtCore import QSize, Qt, QThread, pyqtSignal
+from qgis.PyQt.QtCore import QSize, Qt, QThread, QTimer, pyqtSignal
 from qgis.PyQt.QtGui import QColor, QIcon, QPainter, QPixmap
 from qgis.PyQt.QtWidgets import QAction, QDockWidget, QToolBar
 
@@ -27,6 +27,7 @@ class MapaBaseGeoDouradosPlugin:
         self._icon_normal = None
         self._icon_com_aviso = None
         self._avisou_plugin = False
+        self._atalho_f4 = None
         self._avisou_base = False
 
     def initGui(self):
@@ -58,11 +59,46 @@ class MapaBaseGeoDouradosPlugin:
         self.dock.hide()
         self.dock.visibilityChanged.connect(self._on_visibilidade_dock)
 
+        # Atalho F4 (camada de lotes + ferramenta de seleção): registrado depois que os
+        # demais plugins carregaram, pra não colidir com um F4 que já exista.
+        QTimer.singleShot(4000, self._registrar_f4)
+
         # Checa atualização em segundo plano, sem travar a abertura do QGIS.
         self._checar_atualizacao_em_segundo_plano()
 
+    def _registrar_f4(self):
+        """F4 = ativa a camada de lotes e a ferramenta "Selecionar feição". Se outra ação
+        (ex.: o plugin interno Cadastro Fiscal) já usa F4, não registra: atalho ambíguo faz
+        o Qt não disparar NENHUM dos dois."""
+        try:
+            from qgis.PyQt.QtGui import QKeySequence
+            from qgis.PyQt.QtWidgets import QShortcut
+            tecla = QKeySequence("F4")
+            principal = self.iface.mainWindow()
+            for acao in principal.findChildren(QAction):
+                if acao is not self.action and acao.shortcut() == tecla:
+                    return
+            for atalho in principal.findChildren(QShortcut):
+                if atalho.key() == tecla:
+                    return
+            self._atalho_f4 = QShortcut(tecla, principal)
+            self._atalho_f4.setContext(Qt.ApplicationShortcut)
+            self._atalho_f4.activated.connect(self.selecionar_lotes)
+        except Exception:
+            self._atalho_f4 = None
+
+    def selecionar_lotes(self):
+        from .selecao import ativar_selecao_lotes
+        ok, msg = ativar_selecao_lotes(self.iface)
+        barra = self.iface.messageBar()
+        (barra.pushInfo if ok else barra.pushWarning)("Mapa Base", msg)
+
     def unload(self):
         self.iface.removePluginMenu("Mapa Base - GeoDourados", self.action)
+        if self._atalho_f4 is not None:
+            self._atalho_f4.setEnabled(False)
+            self._atalho_f4.deleteLater()
+            self._atalho_f4 = None
         if getattr(self, "dock", None):
             self.iface.removeDockWidget(self.dock)
             self.dock.deleteLater()

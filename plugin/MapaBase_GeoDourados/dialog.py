@@ -12,6 +12,21 @@ from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontMetric
 PLUGIN_DIR = os.path.dirname(__file__)
 
 
+class CepWorker(QThread):
+    pronto = pyqtSignal(object, str)  # (dados|None, erro)
+
+    def __init__(self, cep8):
+        super().__init__()
+        self.cep8 = cep8
+
+    def run(self):
+        from .cep import consultar_correios
+        try:
+            self.pronto.emit(consultar_correios(self.cep8), "")
+        except Exception as e:
+            self.pronto.emit(None, str(e) or "erro")
+
+
 class DownloadWorker(QThread):
     progress = pyqtSignal(int, str)
     finished = pyqtSignal(bool, str)
@@ -345,6 +360,13 @@ class MapaBaseDialog(QWidget):
         l3.setAlignment(Qt.AlignTop)
         pq.addLayout(l3)
 
+        b_f4 = QPushButton("🖱  Selecionar lotes no mapa  (F4)")
+        b_f4.setFixedHeight(25)
+        b_f4.setToolTip("Deixa a camada de lotes ativa e a ferramenta de seleção pronta — "
+                        "é só clicar no lote. Atalho: tecla F4.")
+        b_f4.clicked.connect(self._on_selecionar_lotes)
+        pq.addWidget(b_f4)
+
         b_ver = QPushButton("📋  Ver atributos do selecionado  →")
         b_ver.setFixedHeight(25)
         b_ver.setToolTip("Abre a aba Atributos com as feições selecionadas.")
@@ -370,6 +392,7 @@ class MapaBaseDialog(QWidget):
 
         # ── Aba ATRIBUTOS ────────────────────────────────────────────────
         pa = pagina("Atributos")
+        self._aba_atributos = self.tabs.count() - 1
         self.lbl_attr = QLabel("")
         self.lbl_attr.setStyleSheet("font-size:10px;font-weight:bold;color:#1a365d;")
         self.lbl_attr.setWordWrap(True)
@@ -428,25 +451,103 @@ class MapaBaseDialog(QWidget):
         except Exception:
             pass
 
-        # ── Aba MAIS ─────────────────────────────────────────────────────
-        pm = pagina("Mais")
-        pm.addWidget(titulo_secao("Links úteis"))
-        LINKS = [
-            ("📄  CND (Certidão Negativa)", "https://cac.dourados.ms.gov.br/emissoes/documentos/certidao-negativa/imovel"),
-            ("💰  Valor Venal", "https://cac.dourados.ms.gov.br/emissoes/documentos/certidao-venal"),
-            ("🏗  Aprova Digital", "https://dourados.aprova.com.br/home"),
-            ("📋  Protocolo BETHA", "https://protocolo.betha.cloud/#/cidadao/dashboard"),
-        ]
-        linha_links1 = QHBoxLayout()
-        linha_links2 = QHBoxLayout()
-        for i, (texto, url) in enumerate(LINKS):
-            btn = QPushButton(texto)
-            btn.setFixedHeight(26)
-            btn.setStyleSheet("font-size:9px;")
-            btn.clicked.connect(lambda _checked, u=url: QDesktopServices.openUrl(QUrl(u)))
-            (linha_links1 if i < 2 else linha_links2).addWidget(btn)
-        pm.addLayout(linha_links1)
-        pm.addLayout(linha_links2)
+        # ── Aba WMS (camadas online mais usadas) ─────────────────────────
+        from .wms import SERVICOS
+        pw = pagina("WMS")
+        self._aba_wms = self.tabs.count() - 1
+        pw.addWidget(titulo_secao("Camadas online (precisam de internet)"))
+        info_wms = QLabel("Abriu o plugin num projeto em branco? Adicione aqui o fundo de mapa que precisar. "
+                          "Imagens de fundo ficam embaixo das camadas; sobreposições (ruas, trânsito) ficam em cima.")
+        info_wms.setWordWrap(True)
+        info_wms.setStyleSheet("font-size:9px;color:#666;")
+        pw.addWidget(info_wms)
+        self._btns_wms = {}
+        for serv in SERVICOS:
+            linha_w = QHBoxLayout()
+            tx = QLabel("<b>%s</b><br><span style='color:#666'>%s</span>" % (serv["nome"], serv["descricao"]))
+            tx.setStyleSheet("font-size:9px;")
+            tx.setWordWrap(True)
+            linha_w.addWidget(tx, 1)
+            bw = QPushButton("Adicionar")
+            bw.setFixedSize(92, 26)
+            bw.clicked.connect(lambda _=False, s=serv: self._on_wms_adicionar(s))
+            linha_w.addWidget(bw)
+            pw.addLayout(linha_w)
+            self._btns_wms[serv["nome"]] = bw
+        self.lbl_wms = QLabel("")
+        self.lbl_wms.setWordWrap(True)
+        self.lbl_wms.setStyleSheet("font-size:9px;color:#555;")
+        pw.addWidget(self.lbl_wms)
+        pw.addStretch()
+
+        # ── Aba MAIS (rolável) ───────────────────────────────────────────
+        from .atalhos import GRUPOS, URL_VALIDADOR_CNM, URL_CORREIOS_CEP
+        area_mais = QScrollArea()
+        area_mais.setWidgetResizable(True)
+        area_mais.setFrameShape(QFrame.NoFrame)
+        cont_mais = QWidget()
+        pm = QVBoxLayout(cont_mais)
+        pm.setContentsMargins(4, 6, 4, 4)
+        pm.setSpacing(5)
+        area_mais.setWidget(cont_mais)
+        self.tabs.addTab(area_mais, "Mais")
+
+        pm.addWidget(titulo_secao("Layouts de impressão (ABNT, A0 a A4)"))
+        info_lay = QLabel("Cria 7 layouts (A0–A4 paisagem; A3 e A4 retrato) na área visível da tela, com "
+                          "quadrícula, legenda, norte e escala. Depois: Projeto › Gerenciador de layouts.")
+        info_lay.setWordWrap(True)
+        info_lay.setStyleSheet("font-size:9px;color:#666;")
+        pm.addWidget(info_lay)
+        b_lay = QPushButton("🖨  Gerar layouts ABNT")
+        b_lay.setFixedHeight(26)
+        b_lay.clicked.connect(self._on_gerar_layouts)
+        pm.addWidget(b_lay)
+
+        pm.addWidget(linha_h())
+        pm.addWidget(titulo_secao("Validadores"))
+        lc = QHBoxLayout()
+        lc.setSpacing(3)
+        self.txt_cep = QLineEdit()
+        self.txt_cep.setPlaceholderText("CEP (ex.: 79822-720)")
+        self.txt_cep.setMaxLength(12)
+        self.txt_cep.returnPressed.connect(self._on_validar_cep)
+        lc.addWidget(self.txt_cep, 1)
+        b_cep = QPushButton("Validar CEP")
+        b_cep.setFixedHeight(24)
+        b_cep.clicked.connect(self._on_validar_cep)
+        lc.addWidget(b_cep)
+        pm.addLayout(lc)
+        self.lbl_cep = QLabel("")
+        self.lbl_cep.setWordWrap(True)
+        self.lbl_cep.setStyleSheet("font-size:9px;")
+        pm.addWidget(self.lbl_cep)
+        lv = QHBoxLayout()
+        b_cnm = QPushButton("🔎  Validador de CNM (ONR)")
+        b_cnm.setFixedHeight(24)
+        b_cnm.setStyleSheet("font-size:9px;")
+        b_cnm.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(URL_VALIDADOR_CNM)))
+        lv.addWidget(b_cnm)
+        b_corr = QPushButton("📮  CEP nos Correios")
+        b_corr.setFixedHeight(24)
+        b_corr.setStyleSheet("font-size:9px;")
+        b_corr.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(URL_CORREIOS_CEP)))
+        lv.addWidget(b_corr)
+        pm.addLayout(lv)
+
+        for nome_grupo, itens_grupo in GRUPOS:
+            pm.addWidget(linha_h())
+            pm.addWidget(titulo_secao(nome_grupo))
+            grade = QGridLayout()
+            grade.setSpacing(3)
+            for i, (texto, url) in enumerate(itens_grupo):
+                btn = QPushButton(texto)
+                btn.setFixedHeight(24)
+                btn.setStyleSheet("font-size:9px;")
+                btn.setToolTip(url)
+                btn.clicked.connect(lambda _checked, u=url: QDesktopServices.openUrl(QUrl(u)))
+                grade.addWidget(btn, i // 2, i % 2)
+            pm.addLayout(grade)
+
         pm.addWidget(linha_h())
         btn_sobre = QPushButton("ℹ  Sobre os dados e termos de uso")
         btn_sobre.setFixedHeight(26)
@@ -768,14 +869,16 @@ class MapaBaseDialog(QWidget):
         return camada
 
     def _ir_para_atributos(self):
-        self.tabs.setCurrentIndex(self.tabs.count() - 2)  # aba Atributos (penúltima)
+        self.tabs.setCurrentIndex(self._aba_atributos)
 
     def _indice_aba_atributos(self):
-        return self.tabs.count() - 2
+        return self._aba_atributos
 
     def _on_aba_mudou(self, indice):
         if indice == self._indice_aba_atributos():
             self._carregar_atributos()
+        elif indice == getattr(self, "_aba_wms", -1):
+            self._atualizar_wms()
 
     def _on_camada_ativa_mudou(self, *args):
         if self.tabs.currentIndex() == self._indice_aba_atributos():
@@ -967,6 +1070,100 @@ class MapaBaseDialog(QWidget):
             self._carregar_atributos()
         if self._camada_tabela is not None:
             self.iface.showAttributeTable(self._camada_tabela)
+
+    # ── F4 / WMS / Layouts / CEP ─────────────────────────────────────────
+    def _on_selecionar_lotes(self):
+        from .selecao import ativar_selecao_lotes
+        ok, msg = ativar_selecao_lotes(self.iface)
+        self.lbl_busca.setText(msg)
+
+    def _atualizar_wms(self):
+        from qgis.core import QgsProject
+        from .wms import SERVICOS, camada_no_projeto
+        projeto = QgsProject.instance()
+        for serv in SERVICOS:
+            b = self._btns_wms[serv["nome"]]
+            ja = camada_no_projeto(projeto, serv) is not None
+            b.setText("✓ No projeto" if ja else "Adicionar")
+            b.setEnabled(not ja)
+
+    def _on_wms_adicionar(self, serv):
+        from qgis.core import QgsProject
+        from . import wms
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            ok, msg = wms.adicionar(QgsProject.instance(), serv)
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.lbl_wms.setText(("✅ " if ok else "⚠ ") + msg)
+        self._atualizar_wms()
+
+    def _on_gerar_layouts(self):
+        from qgis.core import QgsProject, QgsExpressionContextUtils
+        from .camadas import camadas_principais
+        projeto = QgsProject.instance()
+        resp = QMessageBox.question(
+            self, "Gerar layouts ABNT",
+            "Serão criados (ou atualizados) 7 layouts de impressão, A0 a A4, com a área visível da tela "
+            "e as camadas visíveis agora. Layouts com o mesmo nome serão substituídos.\n\nContinuar?",
+            QMessageBox.Yes | QMessageBox.No)
+        if resp != QMessageBox.Yes:
+            return
+        # O módulo grava o responsável técnico (nome/CREA/ART) como variáveis do projeto e imprime
+        # no carimbo. Só o projeto Fonte (banco) usa os dados padrão do autor; nos demais fica em
+        # branco, pro usuário preencher em Projeto › Propriedades › Variáveis.
+        lotes = camadas_principais(projeto)["lotes"]
+        eh_fonte = lotes is not None and lotes.providerType() == "postgres"
+        variaveis = None
+        if not eh_fonte and not QgsExpressionContextUtils.projectScope(projeto).hasVariable("rt_nome"):
+            variaveis = {"rt_nome": "", "rt_titulo": "", "rt_registro": "", "rt_art": "",
+                         "contato": "geodourados@dourados.ms.gov.br"}
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            from . import layouts_tematicos
+            res = layouts_tematicos.criar_layouts(self.iface.mapCanvas().extent(), projeto=projeto, variaveis=variaveis)
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Não foi possível gerar os layouts", str(e))
+            return
+        QApplication.restoreOverrideCursor()
+        self.iface.messageBar().pushSuccess(
+            "Mapa Base", f"{len(res)} layouts ABNT criados/atualizados — veja em Projeto › Gerenciador de layouts.")
+
+    def _on_validar_cep(self):
+        from qgis.core import QgsProject
+        from . import cep
+        cep8 = cep.normalizar(self.txt_cep.text())
+        if not cep8:
+            self.lbl_cep.setText("❌ CEP inválido: informe os 8 dígitos (ex.: 79822-720).")
+            return
+        self._cep_atual = cep8
+        self._cep_local = cep.buscar_local(QgsProject.instance(), cep8)
+        self.lbl_cep.setText("Consultando os Correios...")
+        self._cep_worker = CepWorker(cep8)
+        self._cep_worker.pronto.connect(self._on_cep_pronto)
+        self._cep_worker.start()
+
+    def _on_cep_pronto(self, dados, erro):
+        from . import cep
+        fmt = cep.formatar(self._cep_atual)
+        linhas = []
+        if self._cep_local:
+            ruas = "; ".join(self._cep_local[:4]) + (" …" if len(self._cep_local) > 4 else "")
+            linhas.append(f"✅ {fmt} consta na base de logradouros de Dourados: {ruas}")
+        if erro:
+            linhas.append("⚠ Sem conexão para consultar os Correios." if not self._cep_local
+                          else "(Correios: sem conexão para confirmar.)")
+        elif dados is None:
+            linhas.append(f"❌ {fmt} não foi encontrado nos Correios." if not self._cep_local
+                          else "(Os Correios não retornaram esse CEP.)")
+        else:
+            end = ", ".join(x for x in (dados.get("logradouro"), dados.get("bairro")) if x)
+            cidade = f'{dados.get("localidade", "")}/{dados.get("uf", "")}'
+            linhas.append(f"✅ Correios: {fmt}" + (f" — {end}" if end else "") + f" — {cidade}")
+            if (dados.get("localidade") or "").strip().lower() != "dourados":
+                linhas.append("⚠ Atenção: este CEP não é de Dourados.")
+        self.lbl_cep.setText("\n".join(linhas))
 
     # ── Croqui ───────────────────────────────────────────────────────────
     def _on_gerar_croqui(self, escala_fixa):
