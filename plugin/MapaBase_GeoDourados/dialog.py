@@ -543,7 +543,7 @@ class MapaBaseDialog(QWidget):
         info_comp = QLabel(
             "Dados externos recortados para Dourados e municípios vizinhos, num arquivo separado da base oficial "
             "(~260 MB): IBGE (Censo 2022, CNEFE, setores, trajetos, Censo Agro 2017), CAR, INCRA, FUNAI, embargos, "
-            "VTN e módulo fiscal, mais serviços online (CAR, FUNAI, IBGE BDiA, INPE, ANA, ANM, EPE e satélite).")
+            "VTN, módulo fiscal e OpenStreetMap (vias, rios, redes), mais serviços online (CAR, FUNAI, IBGE BDiA, INPE, ANA, ANM, EPE e satélite).")
         info_comp.setWordWrap(True)
         info_comp.setStyleSheet("font-size:9px;color:#666;")
         pc.addWidget(info_comp)
@@ -577,7 +577,7 @@ class MapaBaseDialog(QWidget):
             "Fontes: IBGE; SICAR/Serviço Florestal Brasileiro; INCRA; FUNAI; IBAMA; Receita Federal. Dados pessoais "
             "(proprietários, CPF/CNPJ, responsáveis técnicos) não fazem parte do pacote. Imagem de satélite EOX "
             "Sentinel-2 cloudless: CC BY-NC-SA 4.0 (uso não comercial) – © EOX IT Services GmbH, contém dados "
-            "Copernicus Sentinel modificados 2023. Esri World Imagery: © Esri, Maxar, Earthstar Geographics.")
+            "Copernicus Sentinel modificados 2023. Esri World Imagery: © Esri, Maxar, Earthstar Geographics. Vias, rios, redes elétricas e telecom: © colaboradores do OpenStreetMap (ODbL).")
         lic.setWordWrap(True)
         lic.setStyleSheet("font-size:9px;color:#666;")
         pc.addWidget(lic)
