@@ -17,6 +17,25 @@ def normalizar(texto):
     return digitos if len(digitos) == 8 else None
 
 
+_MINUSCULAS = {"de", "da", "do", "das", "dos", "e", "em", "a", "o"}
+
+
+def padronizar(nome):
+    """Padrão de escrita dos nomes de rua (base do mapa e Correios): Iniciais Maiúsculas, com
+    de/da/do/das/dos/e em minúsculas. Siglas romanas (II, III, IV...) ficam em maiúsculas."""
+    import re
+    palavras = []
+    for i, p in enumerate((nome or "").strip().split()):
+        base = p.lower()
+        if re.fullmatch(r"[ivxlcdm]+", base) and len(base) > 1 and base not in _MINUSCULAS:
+            palavras.append(p.upper())
+        elif i > 0 and base in _MINUSCULAS:
+            palavras.append(base)
+        else:
+            palavras.append("-".join(x[:1].upper() + x[1:] for x in base.split("-")))
+    return " ".join(palavras)
+
+
 def formatar(cep8):
     return f"{cep8[:5]}-{cep8[5:]}"
 

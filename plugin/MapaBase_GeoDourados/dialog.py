@@ -1484,10 +1484,10 @@ class MapaBaseDialog(QWidget):
             return
         canvas.flashGeometries([achado["geom"]], achado["crs"])
         if not achado["cep8"]:
-            self.lbl_cep.setText(f"⚠ {achado['nome']}: este trecho não tem CEP cadastrado na base.")
+            self.lbl_cep.setText(f"⚠ Mapa: {cep.padronizar(achado['nome'])} não tem CEP cadastrado na base.")
             return
         self.txt_cep.setText(cep.formatar(achado["cep8"]))
-        self._validar_cep(achado["cep8"], f"🛣 {achado['nome']} (eixo clicado)\n")
+        self._validar_cep(achado["cep8"], f"🛣 {cep.padronizar(achado['nome'])} (eixo clicado)\n")
 
     def _on_cep_do_lote(self):
         from qgis.core import QgsProject
@@ -1508,7 +1508,7 @@ class MapaBaseDialog(QWidget):
         self.iface.mapCanvas().flashGeometries([f["geom"] for f in frentes], frentes[0]["crs"])
         linhas = ["🏠 Frente do lote (da menor para a maior testada):"]
         for f in frentes:
-            linhas.append(f"   • {f['nome']} — CEP {cep.formatar(f['cep8']) if f['cep8'] else 'não cadastrado'}"
+            linhas.append(f"   • {cep.padronizar(f['nome'])} — CEP {cep.formatar(f['cep8']) if f['cep8'] else 'não cadastrado'}"
                           f" (testada {f['testada']:.1f} m)")
         com_cep = [f for f in frentes if f["cep8"]]
         prefixo = "\n".join(linhas) + "\n"
@@ -1524,21 +1524,24 @@ class MapaBaseDialog(QWidget):
         from . import cep
         fmt = cep.formatar(self._cep_atual)
         linhas = []
+        # mesmo padrão nas duas linhas:  <ícone> <Fonte>: CEP — Logradouro[, Bairro — Cidade/UF]
         if self._cep_local:
-            ruas = "; ".join(self._cep_local[:4]) + (" …" if len(self._cep_local) > 4 else "")
-            linhas.append(f"✅ {fmt} consta na base de logradouros de Dourados: {ruas}")
-        if erro:
-            linhas.append("⚠ Sem conexão para consultar os Correios." if not self._cep_local
-                          else "(Correios: sem conexão para confirmar.)")
-        elif dados is None:
-            linhas.append(f"❌ {fmt} não foi encontrado nos Correios." if not self._cep_local
-                          else "(Os Correios não retornaram esse CEP.)")
+            ruas = "; ".join(cep.padronizar(r) for r in self._cep_local[:4]) + (" …" if len(self._cep_local) > 4 else "")
+            linhas.append(f"✅ Mapa: {fmt} — {ruas}")
         else:
-            end = ", ".join(x for x in (dados.get("logradouro"), dados.get("bairro")) if x)
-            cidade = f'{dados.get("localidade", "")}/{dados.get("uf", "")}'
-            linhas.append(f"✅ Correios: {fmt}" + (f" — {end}" if end else "") + f" — {cidade}")
+            linhas.append(f"⚠ Mapa: {fmt} — não consta na base de logradouros de Dourados")
+        if erro:
+            linhas.append("⚠ Correios: sem conexão para confirmar")
+        elif dados is None:
+            linhas.append(f"❌ Correios: {fmt} — não encontrado")
+        else:
+            rua = cep.padronizar(dados.get("logradouro") or "")
+            bairro = cep.padronizar(dados.get("bairro") or "")
+            cidade = f'{cep.padronizar(dados.get("localidade", ""))}/{dados.get("uf", "")}'
+            local = ", ".join(x for x in (rua, bairro) if x)
+            linhas.append(f"✅ Correios: {fmt}" + (f" — {local}" if local else "") + f" — {cidade}")
             if (dados.get("localidade") or "").strip().lower() != "dourados":
-                linhas.append("⚠ Atenção: este CEP não é de Dourados.")
+                linhas.append("⚠ Atenção: este CEP não é de Dourados")
         self.lbl_cep.setText(self._cep_prefixo + "\n".join(linhas))
 
     # ── Croqui ───────────────────────────────────────────────────────────
