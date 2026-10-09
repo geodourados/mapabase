@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 
 from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar,
@@ -547,7 +548,12 @@ class MapaBaseDialog(QWidget):
         b_corr.setStyleSheet("font-size:9px;")
         b_corr.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(URL_CORREIOS_CEP)))
         lv.addWidget(b_corr)
+        b_goog = QPushButton("🗺  Conferir no Google Maps")
+        b_goog.setFixedHeight(24)
+        b_goog.setToolTip("Abre o Google Maps com a rua e o CEP validados, para comparar o nome e o CEP da base do Google.")
+        b_goog.clicked.connect(self._on_google_maps)
         pa.addLayout(lv)
+        pa.addWidget(b_goog)
         self.tabs.currentChanged.connect(self._on_aba_mudou)
         try:
             self.iface.currentLayerChanged.connect(self._on_camada_ativa_mudou)
@@ -1519,6 +1525,17 @@ class MapaBaseDialog(QWidget):
             prefixo += "(lote de esquina: validando o CEP da menor testada)\n"
         self.txt_cep.setText(cep.formatar(com_cep[0]["cep8"]))
         self._validar_cep(com_cep[0]["cep8"], prefixo)
+
+    def _on_google_maps(self):
+        """Abre o Google Maps pesquisando a rua (da base do mapa) + CEP + Dourados, para conferir com a base do Google."""
+        from . import cep
+        c8 = cep.normalizar(self.txt_cep.text())
+        if not c8:
+            self.lbl_cep.setText("⚠ Digite ou escolha um CEP (válido) antes de conferir no Google Maps.")
+            return
+        rua = cep.padronizar(self._cep_local[0]) if getattr(self, "_cep_local", None) else ""
+        consulta = ", ".join(x for x in (rua, cep.formatar(c8), "Dourados - MS") if x)
+        QDesktopServices.openUrl(QUrl("https://www.google.com/maps/search/" + urllib.parse.quote(consulta)))
 
     def _on_cep_pronto(self, dados, erro):
         from . import cep
