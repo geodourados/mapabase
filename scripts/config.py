@@ -26,9 +26,9 @@ REPO = "geodourados/mapabase"
 #     banco (fonte oficial confirmada pelo usuário) — nome de override manual, não
 #     é o nome puro da tabela, porque duas camadas do projeto apontam pra essa
 #     mesma tabela com filtros SQL diferentes.
+# O eixo viário (e as demais camadas do app) agora sai do gerar_geojson_app.py.
 CAMADAS_GEOJSON = {
     "lotes_fiscais": "lotes_fiscais",
-    "4_logradouros  atual_e_anterior": "eixo_viario",
 }
 
 GEOJSON_DIR = "dados/geojson"

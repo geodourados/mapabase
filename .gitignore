@@ -11,3 +11,6 @@ logs/
 # Build gerado a partir de plugin/MapaBase_GeoDourados/ — publicado como
 # asset da Release "latest", não versionado no git.
 plugin/MapaBase_GeoDourados_plugin.zip
+
+# Tabela do BIC já filtrada (entrada do gerar_geojson_app.py); só os bic/<setor>.json vão ao git.
+dados/bic_publico.json

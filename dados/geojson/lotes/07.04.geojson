@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "lotes_fiscais",
+"xy_coordinate_resolution": 1e-006,
+"features": [
+{ "type": "Feature", "properties": { "id": 75809, "insc_imob": "07.04.46.04.140", "quadra_cartorio": null, "lote_cartorio": null, "matricula": null, "circunscricao": "1º CIRCUNSCRIÇÃO", "zoneamento": null, "condominio": null, "area_geom": 418.72, "cnm": null }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -54.613509, -22.133809 ], [ -54.6136, -22.13388 ], [ -54.613689, -22.133949 ], [ -54.613732, -22.133982 ], [ -54.61367, -22.134052 ], [ -54.613358, -22.133809 ], [ -54.61342, -22.13374 ], [ -54.613509, -22.133809 ] ] ] } }
+]
+}

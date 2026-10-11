@@ -16,6 +16,7 @@ import time
 
 from config import GEOJSON_DIR, GPKG_LOCAL_PATH, REPO, SOURCE_GPKG_PATH
 from gerar_geojson import main as gerar_geojson
+from gerar_geojson_app import main as gerar_geojson_app
 
 
 def log(msg):
@@ -73,18 +74,20 @@ def publicar_release():
     )
 
 
-def commit_push_eixo_viario():
-    eixo = os.path.join(GEOJSON_DIR, "eixo_viario.geojson")
-    subprocess.run(["git", "add", eixo], check=True)
+def commit_push_geojson():
+    """Versiona no git tudo de dados/geojson (menos o que o .gitignore exclui, como lotes_fiscais.geojson):
+    eixo, quadras, loteamentos, zoneamento, perímetro, lotes por setor, bic por setor e indice.json —
+    arquivos consumidos pelo aplicativo FiscalApp Obras (pelo raw.githubusercontent.com, com ETag)."""
+    subprocess.run(["git", "add", "-A", GEOJSON_DIR], check=True)
 
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"])
     if diff.returncode == 0:
-        log("eixo_viario.geojson sem mudanças — nada para commitar.")
+        log("dados/geojson sem mudanças — nada para commitar.")
         return
 
-    log("Commitando e enviando eixo_viario.geojson...")
+    log("Commitando e enviando dados/geojson...")
     subprocess.run(
-        ["git", "commit", "-m", "Atualização automática do eixo viário"],
+        ["git", "commit", "-m", "Atualização automática dos GeoJSON (app de fiscalização)"],
         check=True,
     )
 
@@ -105,10 +108,10 @@ def commit_push_eixo_viario():
             ],
             check=True,
             env=env,
-            timeout=120,
+            timeout=600,
         )
     except subprocess.TimeoutExpired:
-        log("ERRO: git push travou por mais de 120s — abortado. "
+        log("ERRO: git push travou por mais de 600s — abortado. "
             "Verifique se GH_TOKEN está definido e válido.")
         sys.exit(1)
 
@@ -116,8 +119,9 @@ def commit_push_eixo_viario():
 def main():
     copiar_gpkg_origem()
     gerar_geojson()
+    gerar_geojson_app()
     publicar_release()
-    commit_push_eixo_viario()
+    commit_push_geojson()
     log("Concluído.")
 
 

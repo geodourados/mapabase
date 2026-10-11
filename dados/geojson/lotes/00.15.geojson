@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "lotes_fiscais",
+"xy_coordinate_resolution": 1e-006,
+"features": [
+{ "type": "Feature", "properties": { "id": 81606, "insc_imob": "00.15.02.01.150", "quadra_cartorio": "00", "lote_cartorio": "F", "matricula": "TR-28997", "circunscricao": "2º CIRCUNSCRIÇÃO", "zoneamento": "ZOE - ZONA DE OCUPAÇÃO ESPECIAL", "condominio": null, "area_geom": 976.61, "cnm": null }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -54.92381, -22.190968 ], [ -54.923808, -22.191149 ], [ -54.923331, -22.191219 ], [ -54.923339, -22.191038 ], [ -54.92381, -22.190968 ] ] ] } }
+]
+}
