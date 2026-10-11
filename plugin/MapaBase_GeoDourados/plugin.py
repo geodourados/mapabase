@@ -3,7 +3,8 @@ import os
 from qgis.core import Qgis
 from qgis.PyQt.QtCore import QSize, Qt, QThread, QTimer, pyqtSignal
 from qgis.PyQt.QtGui import QColor, QIcon, QPainter, QPixmap
-from qgis.PyQt.QtWidgets import QAction, QDockWidget, QToolBar
+from qgis.PyQt.QtWidgets import QDockWidget, QToolBar
+from .compat import QAction, QShortcut, mensagem_aviso, mensagem_info
 
 PLUGIN_DIR = os.path.dirname(__file__)
 
@@ -55,7 +56,7 @@ class MapaBaseGeoDouradosPlugin:
         self.dock.setObjectName("MapaBaseGeoDouradosDock")
         self.dock.setWidget(self.dialog)
         self.dialog.dock = self.dock
-        self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock)
+        self.iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
         self.dock.hide()
         self.dock.visibilityChanged.connect(self._on_visibilidade_dock)
 
@@ -72,7 +73,6 @@ class MapaBaseGeoDouradosPlugin:
         o Qt não disparar NENHUM dos dois."""
         try:
             from qgis.PyQt.QtGui import QKeySequence
-            from qgis.PyQt.QtWidgets import QShortcut
             tecla = QKeySequence("F4")
             principal = self.iface.mainWindow()
             for acao in principal.findChildren(QAction):
@@ -82,7 +82,7 @@ class MapaBaseGeoDouradosPlugin:
                 if atalho.key() == tecla:
                     return
             self._atalho_f4 = QShortcut(tecla, principal)
-            self._atalho_f4.setContext(Qt.ApplicationShortcut)
+            self._atalho_f4.setContext(Qt.ShortcutContext.ApplicationShortcut)
             self._atalho_f4.activated.connect(self.selecionar_lotes)
         except Exception:
             self._atalho_f4 = None
@@ -126,7 +126,7 @@ class MapaBaseGeoDouradosPlugin:
             return self._icon_normal
         pix = QPixmap(base)
         painter = QPainter(pix)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         raio = int(pix.width() * 0.32)
         x = pix.width() - raio
         y = 0
@@ -167,10 +167,10 @@ class MapaBaseGeoDouradosPlugin:
             self.iface.messageBar().pushMessage(
                 "Mapa Base - GeoDourados",
                 f"Nova versão do plugin disponível ({versao_plugin}). Abra o plugin e clique em \"Atualizar plugin\".",
-                level=Qgis.Warning, duration=15)
+                level=mensagem_aviso(), duration=15)
         elif base_nova and not self._avisou_base:
             self._avisou_base = True
             self.iface.messageBar().pushMessage(
                 "Mapa Base - GeoDourados",
                 "Há uma nova base de dados publicada. Abra o plugin para atualizar.",
-                level=Qgis.Info, duration=10)
+                level=mensagem_info(), duration=10)

@@ -8,6 +8,7 @@ por uma ferramenta de identificação própria.
 import os
 import re
 import socket
+from .compat import E
 
 NOME_LAYOUT_CROQUI = "GeoDourados - Croqui A4 (Uso Público - Offline)"
 NOME_LAYER_GPKG_LOTES = "lotes_fiscais"
@@ -71,7 +72,7 @@ def _camada_destaque(layer_lotes, feat):
         geom = QgsGeometry(feat.geometry())
         if geom.isNull():
             return None
-        tipo = QgsWkbTypes.displayString(QgsWkbTypes.flatType(geom.wkbType())) or "MultiPolygon"
+        tipo = "MultiPolygon" if geom.isMultipart() else "Polygon"
         tmp = QgsVectorLayer(f"{tipo}?crs={layer_lotes.crs().authid()}", "Lote selecionado (destaque)", "memory")
         if not tmp.isValid():
             return None
@@ -206,7 +207,7 @@ def gerar_croqui(iface, gpkg_path, escala_fixa=1000):
         cfg.dpi = 300
         resultado = QgsLayoutExporter(layout).exportToPdf(destino, cfg)
 
-        if resultado == QgsLayoutExporter.Success:
+        if resultado == E(QgsLayoutExporter, "ExportResult", "Success"):
             QDesktopServices.openUrl(QUrl.fromLocalFile(destino))
             return True, f"Croqui gerado (1:{escala}): {destino}"
         return False, f"Falha ao exportar o croqui (código {resultado})."

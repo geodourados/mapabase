@@ -5,7 +5,7 @@ e o projeto Fonte (PostgreSQL, tabela do banco).
 """
 import re
 
-from qgis.core import QgsDataSourceUri
+from qgis.core import QgsDataSourceUri, QgsVectorLayer
 
 TABELA_LOTES = "lotes_fiscais"
 TABELA_LOTEAMENTOS = "loteamentos"
@@ -30,7 +30,7 @@ def tabela_da_camada(layer):
 def resolver_layer(project, tabela, id_prefixo=None):
     candidatas = []
     for layer in project.mapLayers().values():
-        if layer.type() != layer.VectorLayer:
+        if not isinstance(layer, QgsVectorLayer):
             continue
         if (id_prefixo and layer.id().startswith(id_prefixo)) or tabela_da_camada(layer) == tabela:
             candidatas.append(layer)

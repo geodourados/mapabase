@@ -8,7 +8,9 @@ from qgis.PyQt.QtWidgets import (
     QTabWidget, QStackedWidget, QSizePolicy, QGridLayout, QSlider,
 )
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal, QUrl, QTimer
+from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontMetrics, QColor, QPalette
+from .compat import E
 
 PLUGIN_DIR = os.path.dirname(__file__)
 
@@ -78,10 +80,10 @@ def estilizar_botao_azul(btn):
     btn.setStyleSheet(ESTILO_BOTAO_AZUL)
     pal = btn.palette()
     branco = QColor("#ffffff")
-    for papel in (QPalette.ButtonText, QPalette.WindowText, QPalette.Text, QPalette.BrightText):
-        pal.setColor(QPalette.Active, papel, branco)
-        pal.setColor(QPalette.Inactive, papel, branco)
-        pal.setColor(QPalette.Disabled, papel, branco)
+    for papel in (QPalette.ColorRole.ButtonText, QPalette.ColorRole.WindowText, QPalette.ColorRole.Text, QPalette.ColorRole.BrightText):
+        pal.setColor(QPalette.ColorGroup.Active, papel, branco)
+        pal.setColor(QPalette.ColorGroup.Inactive, papel, branco)
+        pal.setColor(QPalette.ColorGroup.Disabled, papel, branco)
     btn.setPalette(pal)
 
 
@@ -139,7 +141,7 @@ class MapaBaseDialog(QWidget):
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
-        self.scroll.setFrameShape(QFrame.NoFrame)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.conteudo = QWidget()
         corpo = QVBoxLayout(self.conteudo)
         corpo.setContentsMargins(8, 6, 8, 8)
@@ -160,7 +162,7 @@ class MapaBaseDialog(QWidget):
         brasao_path = os.path.join(PLUGIN_DIR, "icons", "brasao.png")
         if os.path.exists(brasao_path):
             lbl = QLabel()
-            lbl.setPixmap(QPixmap(brasao_path).scaled(26, 26, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            lbl.setPixmap(QPixmap(brasao_path).scaled(26, 26, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             hl.addWidget(lbl)
         tl = QLabel("Mapa Base Digital da Cidade de Dourados - MS")
         # Mesmo tamanho de fonte do título do painel (fonte padrão do QGIS).
@@ -172,7 +174,7 @@ class MapaBaseDialog(QWidget):
         _f.setBold(True)
         self._larg_titulo = QFontMetrics(_f).horizontalAdvance(tl.text()) + 6
         tl.setWordWrap(False)
-        tl.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        tl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         hl.addWidget(tl, 1)
         from .sync import versao_plugin_local
         versao = versao_plugin_local()
@@ -222,7 +224,7 @@ class MapaBaseDialog(QWidget):
 
         def linha_h():
             f = QFrame()
-            f.setFrameShape(QFrame.HLine)
+            f.setFrameShape(QFrame.Shape.HLine)
             return f
 
         # ── Aba BASE ─────────────────────────────────────────────────────
@@ -259,7 +261,7 @@ class MapaBaseDialog(QWidget):
         self.prog_bar.setFixedHeight(14)
         pb.addWidget(self.prog_bar)
         self.lbl_prog = QLabel("")
-        self.lbl_prog.setAlignment(Qt.AlignCenter)
+        self.lbl_prog.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_prog.setStyleSheet("font-size:9px;color:#555;")
         pb.addWidget(self.lbl_prog)
 
@@ -282,7 +284,7 @@ class MapaBaseDialog(QWidget):
         pb.addWidget(lbl_pers_info)
         self.lista_pers = QListWidget()
         self.lista_pers.setFixedHeight(70)
-        self.lista_pers.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.lista_pers.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         pb.addWidget(self.lista_pers)
         linha_botoes = QHBoxLayout()
         self.btn_salvar_pers = QPushButton("💾  Salvar como novo")
@@ -364,11 +366,11 @@ class MapaBaseDialog(QWidget):
         l3 = QHBoxLayout()
         l3.setSpacing(2)
         self.lista_busca = QListWidget()
-        self.lista_busca.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.lista_busca.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.lista_busca.itemClicked.connect(self._on_resultado_clicado)
         self.lista_busca.itemActivated.connect(self._on_resultado_clicado)
         self.lista_busca.setFixedHeight(60)
-        self.lista_busca.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.lista_busca.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         l3.addWidget(self.lista_busca, 1)
         col = QVBoxLayout()
         col.setSpacing(2)
@@ -383,7 +385,7 @@ class MapaBaseDialog(QWidget):
         b_alt.clicked.connect(self._ajustar_altura_lista)
         col.addWidget(b_alt)
         l3.addLayout(col)
-        l3.setAlignment(Qt.AlignTop)
+        l3.setAlignment(Qt.AlignmentFlag.AlignTop)
         pq.addLayout(l3)
 
         b_f4 = QPushButton("🖱  Selecionar lotes no mapa  (F4)")
@@ -461,7 +463,7 @@ class MapaBaseDialog(QWidget):
         nav.addWidget(self.btn_prev)
         self.lbl_pos = QLabel("")
         self.lbl_pos.setStyleSheet("font-size:9px;")
-        self.lbl_pos.setAlignment(Qt.AlignCenter)
+        self.lbl_pos.setAlignment(Qt.AlignmentFlag.AlignCenter)
         nav.addWidget(self.lbl_pos, 1)
         self.btn_next = QPushButton("▶")
         self.btn_next.setFixedSize(26, 22)
@@ -488,7 +490,7 @@ class MapaBaseDialog(QWidget):
         # página 0: formulário
         self.scroll_form = QScrollArea()
         self.scroll_form.setWidgetResizable(True)
-        self.scroll_form.setFrameShape(QFrame.NoFrame)
+        self.scroll_form.setFrameShape(QFrame.Shape.NoFrame)
         self.cont_form = QWidget()
         self.lay_form = QVBoxLayout(self.cont_form)
         self.lay_form.setContentsMargins(0, 0, 0, 0)
@@ -608,10 +610,10 @@ class MapaBaseDialog(QWidget):
         pw.addWidget(info_mb)
         from .mapbiomas import ANOS as _ANOS_MB
         linha_mb = QHBoxLayout()
-        self.sl_mb = QSlider(Qt.Horizontal)
+        self.sl_mb = QSlider(Qt.Orientation.Horizontal)
         self.sl_mb.setRange(*_ANOS_MB)
         self.sl_mb.setValue(_ANOS_MB[1])
-        self.sl_mb.setTickPosition(QSlider.TicksBelow)
+        self.sl_mb.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.sl_mb.setTickInterval(5)
         self.lb_mb = QLabel(str(_ANOS_MB[1]))
         self.lb_mb.setProperty("fonte_uniforme", True)
@@ -686,7 +688,7 @@ class MapaBaseDialog(QWidget):
         from .atalhos import GRUPOS, URL_VALIDADOR_CNM, URL_CORREIOS_CEP
         area_mais = QScrollArea()
         area_mais.setWidgetResizable(True)
-        area_mais.setFrameShape(QFrame.NoFrame)
+        area_mais.setFrameShape(QFrame.Shape.NoFrame)
         cont_mais = QWidget()
         pm = QVBoxLayout(cont_mais)
         pm.setContentsMargins(4, 6, 4, 4)
@@ -768,7 +770,7 @@ class MapaBaseDialog(QWidget):
         _ft = self.tabs.tabBar().font()
         _ft.setPointSizeF(self._pt + 1)
         self.tabs.tabBar().setFont(_ft)
-        self.tabs.tabBar().setElideMode(Qt.ElideNone)
+        self.tabs.tabBar().setElideMode(Qt.TextElideMode.ElideNone)
         self.tabs.tabBar().setUsesScrollButtons(False)
 
     # ── Status ───────────────────────────────────────────────────────────
@@ -806,7 +808,7 @@ class MapaBaseDialog(QWidget):
     def _on_atualizar_plugin(self):
         from qgis.PyQt.QtWidgets import QApplication
         from .sync import atualizar_plugin
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             ok, info = atualizar_plugin()
         finally:
@@ -891,7 +893,7 @@ class MapaBaseDialog(QWidget):
             area = self._area_disponivel()
             self.dock.resize(largura, min(self.dock.height(), int(area.height() * 0.92)))
         else:
-            self.iface.mainWindow().resizeDocks([dock], [largura], Qt.Horizontal)
+            self.iface.mainWindow().resizeDocks([dock], [largura], Qt.Orientation.Horizontal)
 
     def _on_fechar_painel(self):
         if self.dock is not None:
@@ -921,7 +923,7 @@ class MapaBaseDialog(QWidget):
             self._header.setFixedSize(self.LARGURA_RECOLHIDO - 8, 24)
             self.btn_recolher.setFixedSize(24, 24)
             if not dock.isFloating():
-                self.iface.mainWindow().resizeDocks([dock], [self.LARGURA_RECOLHIDO], Qt.Horizontal)
+                self.iface.mainWindow().resizeDocks([dock], [self.LARGURA_RECOLHIDO], Qt.Orientation.Horizontal)
             else:
                 dock.resize(self.LARGURA_RECOLHIDO, dock.height())
         else:
@@ -940,7 +942,7 @@ class MapaBaseDialog(QWidget):
             dock.setMaximumWidth(16777215)
             largura = self._largura_recolher or 400
             if not dock.isFloating():
-                self.iface.mainWindow().resizeDocks([dock], [largura], Qt.Horizontal)
+                self.iface.mainWindow().resizeDocks([dock], [largura], Qt.Orientation.Horizontal)
             else:
                 dock.resize(largura, dock.height())
 
@@ -1007,7 +1009,7 @@ class MapaBaseDialog(QWidget):
         self.lista_busca.clear()
         for i, it in enumerate(self._itens_busca):
             li = QListWidgetItem(it["rotulo"])
-            li.setData(Qt.UserRole, i)
+            li.setData(Qt.ItemDataRole.UserRole, i)
             self.lista_busca.addItem(li)
         self._ajustar_altura_lista()
 
@@ -1027,7 +1029,7 @@ class MapaBaseDialog(QWidget):
         self.lista_busca.setFixedHeight(altura_linha * linhas + 2 * self.lista_busca.frameWidth() + 4)
 
     def _itens_do_clique(self, itens_lista):
-        return [self._itens_busca[li.data(Qt.UserRole)] for li in itens_lista]
+        return [self._itens_busca[li.data(Qt.ItemDataRole.UserRole)] for li in itens_lista]
 
     def _on_resultado_clicado(self, item):
         from . import busca
@@ -1060,7 +1062,7 @@ class MapaBaseDialog(QWidget):
         from qgis.core import QgsProject
         from .camadas import camadas_principais
         camada = self.iface.activeLayer()
-        if camada is None or camada.type() != camada.VectorLayer:
+        if camada is None or not isinstance(camada, QgsVectorLayer):
             camada = camadas_principais(QgsProject.instance())["lotes"]
         return camada
 
@@ -1157,7 +1159,7 @@ class MapaBaseDialog(QWidget):
             self.lbl_pos.setText("")
             msg = QLabel("Nenhuma feição selecionada.\nSelecione no mapa ou use a aba Buscar.")
             msg.setStyleSheet("color:#718096;padding:12px;")
-            msg.setAlignment(Qt.AlignCenter)
+            msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.lay_form.addWidget(msg)
             self.lay_form.addStretch()
             return
@@ -1215,10 +1217,10 @@ class MapaBaseDialog(QWidget):
             texto = self._texto_valor(camada, i, feat.attribute(i))
             rot = QLabel(camada.attributeDisplayName(i))
             rot.setStyleSheet("color:#4a5568;font-weight:bold;")
-            rot.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+            rot.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             val = QLabel(texto if texto != "" else "—")
             val.setWordWrap(True)
-            val.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             val.setStyleSheet("" if texto != "" else "color:#a0aec0;")
             grade.addWidget(rot, linha, 0)
             grade.addWidget(val, linha, 1)
@@ -1247,7 +1249,7 @@ class MapaBaseDialog(QWidget):
             self.lbl_attr.setText(f"{camada.name()} — {total} feição(ões){extra}")
         dv = QgsDualView(self.cont_tabela)
         dv.init(camada, self.iface.mapCanvas(), req, QgsAttributeEditorContext())
-        dv.setView(QgsDualView.AttributeTable)
+        dv.setView(E(QgsDualView, "ViewMode", "AttributeTable"))
         # Mesmas regras do formulário: esconde os campos internos também na tabela
         # (sem alterar a configuração da camada).
         try:
@@ -1327,7 +1329,7 @@ class MapaBaseDialog(QWidget):
     def _on_complemento_adicionar(self):
         from qgis.core import QgsProject
         from . import complemento
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             ok, msg = complemento.adicionar_ao_projeto(QgsProject.instance())
         finally:
@@ -1344,7 +1346,7 @@ class MapaBaseDialog(QWidget):
         # solto o slider sem a camada no projeto: só o botão adiciona; com ela, troca o ano
         if not mapbiomas.camadas(QgsProject.instance()) and self.sender() is self.sl_mb:
             return
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             ok, msg = mapbiomas.adicionar(QgsProject.instance(), self.sl_mb.value())
         finally:
@@ -1354,7 +1356,7 @@ class MapaBaseDialog(QWidget):
     def _on_wms_adicionar(self, serv):
         from qgis.core import QgsProject
         from . import wms
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             ok, msg = wms.adicionar(QgsProject.instance(), serv)
         finally:
@@ -1383,7 +1385,7 @@ class MapaBaseDialog(QWidget):
         from . import layouts_tematicos as lt
         projeto = QgsProject.instance()
         formato = lt.FORMATOS[indice]
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         layout = None
         try:
             res = lt.criar_layouts(self.iface.mapCanvas().extent(), projeto=projeto,
@@ -1395,7 +1397,7 @@ class MapaBaseDialog(QWidget):
             destino = os.path.join(pasta, nome + ".pdf")
             cfg = QgsLayoutExporter.PdfExportSettings()
             cfg.dpi = 200
-            ok = QgsLayoutExporter(layout).exportToPdf(destino, cfg) == QgsLayoutExporter.Success
+            ok = QgsLayoutExporter(layout).exportToPdf(destino, cfg) == E(QgsLayoutExporter, "ExportResult", "Success")
         except Exception as e:
             QApplication.restoreOverrideCursor()
             QMessageBox.critical(self, "Não foi possível gerar o mapa", str(e))
@@ -1416,8 +1418,8 @@ class MapaBaseDialog(QWidget):
             self, "Gerar layouts ABNT",
             "Serão criados (ou atualizados) 7 layouts de impressão, A0 a A4, com a área visível da tela "
             "e as camadas visíveis agora. Layouts com o mesmo nome serão substituídos.\n\nContinuar?",
-            QMessageBox.Yes | QMessageBox.No)
-        if resp != QMessageBox.Yes:
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if resp != QMessageBox.StandardButton.Yes:
             return
         # O módulo grava o responsável técnico (nome/CREA/ART) como variáveis do projeto e imprime
         # no carimbo. Só o projeto Fonte (banco) usa os dados padrão do autor; nos demais fica em
@@ -1428,7 +1430,7 @@ class MapaBaseDialog(QWidget):
         if not eh_fonte and not QgsExpressionContextUtils.projectScope(projeto).hasVariable("rt_nome"):
             variaveis = {"rt_nome": "", "rt_titulo": "", "rt_registro": "", "rt_art": "",
                          "contato": "geodourados@dourados.ms.gov.br"}
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             from . import layouts_tematicos
             res = layouts_tematicos.criar_layouts(self.iface.mapCanvas().extent(), projeto=projeto, variaveis=variaveis)
@@ -1581,7 +1583,7 @@ class MapaBaseDialog(QWidget):
         nome, ok_clicou = QInputDialog.getText(
             self, "Salvar projeto como",
             "Nome pra esse projeto (ex: \"Zona Norte\", \"Fiscalização 2026\"):",
-            QLineEdit.Normal, "",
+            QLineEdit.EchoMode.Normal, "",
         )
         if not ok_clicou or not slug_nome_projeto(nome):
             return
@@ -1591,9 +1593,9 @@ class MapaBaseDialog(QWidget):
             resp = QMessageBox.question(
                 self, "Já existe",
                 f'Já existe um projeto salvo com o nome "{nome}". Substituir?',
-                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            if resp != QMessageBox.Yes:
+            if resp != QMessageBox.StandardButton.Yes:
                 return
 
         paths = get_local_paths()
@@ -1628,9 +1630,9 @@ class MapaBaseDialog(QWidget):
         resp = QMessageBox.question(
             self, "Excluir projeto",
             f'Excluir o projeto salvo "{nome}"? Essa ação não pode ser desfeita.',
-            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        if resp != QMessageBox.Yes:
+        if resp != QMessageBox.StandardButton.Yes:
             return
         try:
             os.remove(caminho_meu_projeto(nome))

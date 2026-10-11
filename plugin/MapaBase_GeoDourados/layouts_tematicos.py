@@ -14,6 +14,7 @@ import tempfile
 from qgis.core import *
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QFont, QColor
+from .compat import E, definir_figura
 
 # Estado da geração em curso (preenchido por criar_layouts; as funções de desenho leem daqui)
 P = LM = EXT = VISIVEIS = DESTAQUE = None
@@ -56,7 +57,7 @@ def criar_tema():
 def fora_da_legenda(l):
     # imagens de fundo (XYZ/WMS/raster) e camadas "ao vivo" do Waze não entram na legenda
     # camadas temporárias (memória: prévias, desenhos) também não entram na legenda
-    return (l is None or l.type() != QgsMapLayerType.VectorLayer or 'waze' in l.name().lower()
+    return (l is None or not isinstance(l, QgsVectorLayer) or 'waze' in l.name().lower()
             or l.providerType() == 'memory')
 
 
@@ -99,19 +100,19 @@ def tfmt(size, bold=False, color='0,0,0'):
     qf.setBold(bold)
     f.setFont(qf)
     f.setSize(size)
-    f.setSizeUnit(QgsUnitTypes.RenderPoints)
+    f.setSizeUnit(E(Qgis, "RenderUnit", "Points", (QgsUnitTypes, "RenderPoints")))
     f.setColor(QColor(*[int(c) for c in color.split(',')]))
     return f
 
 
 def place(item, x, y, w, h):
-    item.attemptMove(QgsLayoutPoint(x, y, QgsUnitTypes.LayoutMillimeters))
-    item.attemptResize(QgsLayoutSize(w, h, QgsUnitTypes.LayoutMillimeters))
+    item.attemptMove(QgsLayoutPoint(x, y, E(Qgis, "LayoutUnit", "Millimeters", (QgsUnitTypes, "LayoutMillimeters"))))
+    item.attemptResize(QgsLayoutSize(w, h, E(Qgis, "LayoutUnit", "Millimeters", (QgsUnitTypes, "LayoutMillimeters"))))
 
 
 def rect(L, x, y, w, h, sw=0.25, fill=None, iid=''):
     s = QgsLayoutItemShape(L)
-    s.setShapeType(QgsLayoutItemShape.Rectangle)
+    s.setShapeType(E(QgsLayoutItemShape, "Shape", "Rectangle"))
     props = {'outline_color': '0,0,0,255', 'outline_width': str(sw), 'outline_width_unit': 'MM',
              'joinstyle': 'miter'}
     if fill:
@@ -126,7 +127,7 @@ def rect(L, x, y, w, h, sw=0.25, fill=None, iid=''):
     return s
 
 
-def label(L, text, x, y, w, h, size, bold=False, ha=Qt.AlignLeft, va=Qt.AlignTop, iid='', html=False, rich=False):
+def label(L, text, x, y, w, h, size, bold=False, ha=Qt.AlignmentFlag.AlignLeft, va=Qt.AlignmentFlag.AlignTop, iid='', html=False, rich=False):
     lb = QgsLayoutItemLabel(L)
     lb.setText(text)
     tf = tfmt(size, bold)
@@ -137,7 +138,7 @@ def label(L, text, x, y, w, h, size, bold=False, ha=Qt.AlignLeft, va=Qt.AlignTop
     lb.setMarginX(0)
     lb.setMarginY(0)
     if html:
-        lb.setMode(QgsLayoutItemLabel.ModeHtml)
+        lb.setMode(E(QgsLayoutItemLabel, "Mode", "ModeHtml"))
     L.addLayoutItem(lb)
     place(lb, x, y, w, h)
     lb.setId(iid)
@@ -148,9 +149,9 @@ def label(L, text, x, y, w, h, size, bold=False, ha=Qt.AlignLeft, va=Qt.AlignTop
 
 def pic(L, path, x, y, w, h, iid):
     pc = QgsLayoutItemPicture(L)
-    pc.setPicturePath(path, Qgis.PictureFormat.Raster)
-    pc.setResizeMode(QgsLayoutItemPicture.Zoom)
-    pc.setPictureAnchor(QgsLayoutItem.Middle)
+    definir_figura(pc, path)
+    pc.setResizeMode(E(QgsLayoutItemPicture, "ResizeMode", "Zoom"))
+    pc.setPictureAnchor(E(QgsLayoutItem, "ReferencePoint", "Middle"))
     L.addLayoutItem(pc)
     place(pc, x, y, w, h)
     pc.setId(iid)
@@ -181,7 +182,7 @@ def build(fmt, W, H, m, orient):
     L = QgsPrintLayout(P)
     L.initializeDefaults()
     L.setName(nome)
-    L.pageCollection().page(0).setPageSize(QgsLayoutSize(W, H, QgsUnitTypes.LayoutMillimeters))
+    L.pageCollection().page(0).setPageSize(QgsLayoutSize(W, H, E(Qgis, "LayoutUnit", "Millimeters", (QgsUnitTypes, "LayoutMillimeters"))))
     LM.addLayout(L)
 
     k = (min(W, H) / 210.0) ** 0.7          # fator de escala tipográfica
@@ -235,7 +236,7 @@ def build(fmt, W, H, m, orient):
     place(mp, mx, my, mw, mh)
     mp.setCrs(P.crs())
     mp.setFrameEnabled(True)
-    mp.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, QgsUnitTypes.LayoutMillimeters))
+    mp.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, E(Qgis, "LayoutUnit", "Millimeters", (QgsUnitTypes, "LayoutMillimeters"))))
     mp.zoomToExtent(EXT)
     mp.setScale(nice_up(mp.scale()))
     if DESTAQUE is not None:
@@ -254,29 +255,29 @@ def build(fmt, W, H, m, orient):
     gu = QgsLayoutItemMapGrid('Grade UTM (SIRGAS 2000 / 21S)', mp)
     mp.grids().addGrid(gu)
     gu.setCrs(P.crs())
-    gu.setUnits(QgsLayoutItemMapGrid.DynamicPageSizeBased)
+    gu.setUnits(E(QgsLayoutItemMapGrid, "GridUnit", "DynamicPageSizeBased"))
     gu.setMinimumIntervalWidth(35 * k)
     gu.setMaximumIntervalWidth(70 * k)
-    gu.setStyle(QgsLayoutItemMapGrid.Solid)
+    gu.setStyle(E(QgsLayoutItemMapGrid, "GridStyle", "Solid"))
     gu.setLineSymbol(QgsLineSymbol.createSimple({'color': '60,60,60,140', 'width': str(0.1 * k), 'width_unit': 'MM'}))
-    gu.setFrameStyle(QgsLayoutItemMapGrid.ExteriorTicks)
+    gu.setFrameStyle(E(QgsLayoutItemMapGrid, "FrameStyle", "ExteriorTicks"))
     gu.setFrameWidth(1.5 * k)
     gu.setFramePenSize(0.2)
-    for side, on in ((QgsLayoutItemMapGrid.FrameLeft, True), (QgsLayoutItemMapGrid.FrameBottom, True),
-                     (QgsLayoutItemMapGrid.FrameRight, False), (QgsLayoutItemMapGrid.FrameTop, False)):
+    for side, on in ((E(QgsLayoutItemMapGrid, "FrameSideFlag", "FrameLeft"), True), (E(QgsLayoutItemMapGrid, "FrameSideFlag", "FrameBottom"), True),
+                     (E(QgsLayoutItemMapGrid, "FrameSideFlag", "FrameRight"), False), (E(QgsLayoutItemMapGrid, "FrameSideFlag", "FrameTop"), False)):
         gu.setFrameSideFlag(side, on)
     gu.setAnnotationEnabled(True)
-    gu.setAnnotationFormat(QgsLayoutItemMapGrid.CustomFormat)
+    gu.setAnnotationFormat(E(QgsLayoutItemMapGrid, "AnnotationFormat", "CustomFormat"))
     gu.setAnnotationExpression("format_number(@grid_number, 0) || if(@grid_axis = 'x', ' E', ' N')")
     gu.setAnnotationTextFormat(tfmt(5 * k))
     gu.setAnnotationFrameDistance(0.8 * k)
-    for side in (QgsLayoutItemMapGrid.Left, QgsLayoutItemMapGrid.Bottom):
-        gu.setAnnotationPosition(QgsLayoutItemMapGrid.OutsideMapFrame, side)
-        gu.setAnnotationDisplay(QgsLayoutItemMapGrid.ShowAll, side)
-    for side in (QgsLayoutItemMapGrid.Right, QgsLayoutItemMapGrid.Top):
-        gu.setAnnotationDisplay(QgsLayoutItemMapGrid.HideAll, side)
-    gu.setAnnotationDirection(QgsLayoutItemMapGrid.Vertical, QgsLayoutItemMapGrid.Left)
-    gu.setAnnotationDirection(QgsLayoutItemMapGrid.Horizontal, QgsLayoutItemMapGrid.Bottom)
+    for side in (E(QgsLayoutItemMapGrid, "BorderSide", "Left"), E(QgsLayoutItemMapGrid, "BorderSide", "Bottom")):
+        gu.setAnnotationPosition(E(QgsLayoutItemMapGrid, "AnnotationPosition", "OutsideMapFrame"), side)
+        gu.setAnnotationDisplay(E(QgsLayoutItemMapGrid, "DisplayMode", "ShowAll"), side)
+    for side in (E(QgsLayoutItemMapGrid, "BorderSide", "Right"), E(QgsLayoutItemMapGrid, "BorderSide", "Top")):
+        gu.setAnnotationDisplay(E(QgsLayoutItemMapGrid, "DisplayMode", "HideAll"), side)
+    gu.setAnnotationDirection(E(QgsLayoutItemMapGrid, "AnnotationDirection", "Vertical"), E(QgsLayoutItemMapGrid, "BorderSide", "Left"))
+    gu.setAnnotationDirection(E(QgsLayoutItemMapGrid, "AnnotationDirection", "Horizontal"), E(QgsLayoutItemMapGrid, "BorderSide", "Bottom"))
 
     # Grade geográfica (rede de paralelos e meridianos) – anotações superior/direita
     geo = QgsCoordinateReferenceSystem('EPSG:4674')
@@ -293,25 +294,25 @@ def build(fmt, W, H, m, orient):
     gg.setCrs(geo)
     gg.setIntervalX(step / 3600.0)
     gg.setIntervalY(step / 3600.0)
-    gg.setStyle(QgsLayoutItemMapGrid.FrameAnnotationsOnly)
-    gg.setFrameStyle(QgsLayoutItemMapGrid.ExteriorTicks)
+    gg.setStyle(E(QgsLayoutItemMapGrid, "FrameStyle", "FrameAnnotationsOnly"))
+    gg.setFrameStyle(E(QgsLayoutItemMapGrid, "FrameStyle", "ExteriorTicks"))
     gg.setFrameWidth(1.5 * k)
     gg.setFramePenSize(0.2)
-    for side, on in ((QgsLayoutItemMapGrid.FrameLeft, False), (QgsLayoutItemMapGrid.FrameBottom, False),
-                     (QgsLayoutItemMapGrid.FrameRight, True), (QgsLayoutItemMapGrid.FrameTop, True)):
+    for side, on in ((E(QgsLayoutItemMapGrid, "FrameSideFlag", "FrameLeft"), False), (E(QgsLayoutItemMapGrid, "FrameSideFlag", "FrameBottom"), False),
+                     (E(QgsLayoutItemMapGrid, "FrameSideFlag", "FrameRight"), True), (E(QgsLayoutItemMapGrid, "FrameSideFlag", "FrameTop"), True)):
         gg.setFrameSideFlag(side, on)
     gg.setAnnotationEnabled(True)
-    gg.setAnnotationFormat(QgsLayoutItemMapGrid.DegreeMinuteSecond)
+    gg.setAnnotationFormat(E(QgsLayoutItemMapGrid, "AnnotationFormat", "DegreeMinuteSecond"))
     gg.setAnnotationPrecision(0)
     gg.setAnnotationTextFormat(tfmt(5 * k))
     gg.setAnnotationFrameDistance(0.8 * k)
-    for side in (QgsLayoutItemMapGrid.Right, QgsLayoutItemMapGrid.Top):
-        gg.setAnnotationPosition(QgsLayoutItemMapGrid.OutsideMapFrame, side)
-        gg.setAnnotationDisplay(QgsLayoutItemMapGrid.ShowAll, side)
-    for side in (QgsLayoutItemMapGrid.Left, QgsLayoutItemMapGrid.Bottom):
-        gg.setAnnotationDisplay(QgsLayoutItemMapGrid.HideAll, side)
-    gg.setAnnotationDirection(QgsLayoutItemMapGrid.Vertical, QgsLayoutItemMapGrid.Right)
-    gg.setAnnotationDirection(QgsLayoutItemMapGrid.Horizontal, QgsLayoutItemMapGrid.Top)
+    for side in (E(QgsLayoutItemMapGrid, "BorderSide", "Right"), E(QgsLayoutItemMapGrid, "BorderSide", "Top")):
+        gg.setAnnotationPosition(E(QgsLayoutItemMapGrid, "AnnotationPosition", "OutsideMapFrame"), side)
+        gg.setAnnotationDisplay(E(QgsLayoutItemMapGrid, "DisplayMode", "ShowAll"), side)
+    for side in (E(QgsLayoutItemMapGrid, "BorderSide", "Left"), E(QgsLayoutItemMapGrid, "BorderSide", "Bottom")):
+        gg.setAnnotationDisplay(E(QgsLayoutItemMapGrid, "DisplayMode", "HideAll"), side)
+    gg.setAnnotationDirection(E(QgsLayoutItemMapGrid, "AnnotationDirection", "Vertical"), E(QgsLayoutItemMapGrid, "BorderSide", "Right"))
+    gg.setAnnotationDirection(E(QgsLayoutItemMapGrid, "AnnotationDirection", "Horizontal"), E(QgsLayoutItemMapGrid, "BorderSide", "Top"))
     mp.updateBoundingRect()
 
     MV = f"item_variables('{MAP_ID}')"
@@ -326,28 +327,28 @@ def build(fmt, W, H, m, orient):
     label(L, 'PREFEITURA MUNICIPAL DE DOURADOS – MS\n'
              'Secretaria Municipal de Planejamento – SEPLAN\n'
              'Departamento de Geoprocessamento',
-          cx + 2 * pad + bw, cy + pad, cw - 4 * pad - bw - gw, lh, min(5.2 * k, (cw - 4 * pad - bw - gw) / 10.5), True, Qt.AlignHCenter,
-          Qt.AlignVCenter, 'Cabeçalho')
+          cx + 2 * pad + bw, cy + pad, cw - 4 * pad - bw - gw, lh, min(5.2 * k, (cw - 4 * pad - bw - gw) / 10.5), True, Qt.AlignmentFlag.AlignHCenter,
+          Qt.AlignmentFlag.AlignVCenter, 'Cabeçalho')
 
     # ---------------- Título ----------------
     cx, cy, cw, ch = cells['title']
     label(L, '[% upper(@project_title) %]', cx + pad, cy + pad, cw - 2 * pad, ch * 0.55 - pad,
-          10 * k, True, Qt.AlignHCenter, Qt.AlignVCenter, 'Título')
+          10 * k, True, Qt.AlignmentFlag.AlignHCenter, Qt.AlignmentFlag.AlignVCenter, 'Título')
     label(L, '[% @project_basename %]', cx + pad, cy + ch * 0.55, cw - 2 * pad, ch * 0.45 - pad,
-          7.5 * k, False, Qt.AlignHCenter, Qt.AlignVCenter, 'Subtítulo (tema)')
+          7.5 * k, False, Qt.AlignmentFlag.AlignHCenter, Qt.AlignmentFlag.AlignVCenter, 'Subtítulo (tema)')
 
     # ---------------- Mapa de localização ----------------
     cx, cy, cw, ch = cells['inset']
     tl = 3.2 * k
     label(L, 'LOCALIZAÇÃO NO MUNICÍPIO', cx + pad, cy + pad, cw - 2 * pad, tl, 6 * k, True,
-          Qt.AlignHCenter, Qt.AlignVCenter, 'Título localização')
+          Qt.AlignmentFlag.AlignHCenter, Qt.AlignmentFlag.AlignVCenter, 'Título localização')
     inset = QgsLayoutItemMap(L)
     inset.setId('Mapa de localização')
     L.addLayoutItem(inset)
     place(inset, cx + pad, cy + pad + tl + pad * 0.5, cw - 2 * pad, ch - 2.5 * pad - tl)
     inset.setCrs(P.crs())
     inset.setFrameEnabled(True)
-    inset.setFrameStrokeWidth(QgsLayoutMeasurement(0.2, QgsUnitTypes.LayoutMillimeters))
+    inset.setFrameStrokeWidth(QgsLayoutMeasurement(0.2, E(Qgis, "LayoutUnit", "Millimeters", (QgsUnitTypes, "LayoutMillimeters"))))
     inset_layers = [l for l in (lyr('Perímetro urbano (Lei 3929/2015)'), lyr('Limite Município')) if l]
     if inset_layers:
         inset.setLayers(inset_layers)
@@ -376,21 +377,24 @@ def build(fmt, W, H, m, orient):
     leg.setSplitLayer(True)
     leg.setBoxSpace(pad)
     leg.setWrapString('|')
-    leg.setTitleAlignment(Qt.AlignHCenter)
+    leg.setTitleAlignment(Qt.AlignmentFlag.AlignHCenter)
 
     def ajustar(f, colunas):
         leg.setColumnCount(colunas)
         leg.setSymbolWidth(5 * k * f)
         leg.setSymbolHeight(3 * k * f)
-        leg.rstyle(QgsLegendStyle.Title).setTextFormat(tfmt(7.5 * k * f, True))
-        leg.rstyle(QgsLegendStyle.Group).setTextFormat(tfmt(6.5 * k * f, True))
-        leg.rstyle(QgsLegendStyle.Subgroup).setTextFormat(tfmt(6 * k * f, True))
-        leg.rstyle(QgsLegendStyle.SymbolLabel).setTextFormat(tfmt(5.5 * k * f))
+        leg.rstyle(E(QgsLegendStyle, "Style", "Title")).setTextFormat(tfmt(7.5 * k * f, True))
+        leg.rstyle(E(QgsLegendStyle, "Style", "Group")).setTextFormat(tfmt(6.5 * k * f, True))
+        leg.rstyle(E(QgsLegendStyle, "Style", "Subgroup")).setTextFormat(tfmt(6 * k * f, True))
+        leg.rstyle(E(QgsLegendStyle, "Style", "SymbolLabel")).setTextFormat(tfmt(5.5 * k * f))
         leg.setResizeToContents(True)
         # o tamanho real (já com o filtro pelo mapa) só é calculado quando o item é desenhado
         cfg = QgsLayoutExporter.ImageExportSettings()
         cfg.dpi = 15
-        QgsLayoutExporter(L).exportToImage(os.path.join(tempfile.gettempdir(), '_gd_leg_fit.png'), cfg)
+        tmp_png = os.path.join(tempfile.gettempdir(), '_gd_leg_fit.png')
+        if os.path.exists(tmp_png):
+            os.remove(tmp_png)          # o GDAL não regrava PNG existente
+        QgsLayoutExporter(L).exportToImage(tmp_png, cfg)
         return leg.rect().width() <= cw - pad and leg.rect().height() <= ch - pad
 
     # a legenda tem que caber inteira na célula: reduz a fonte e, se preciso, usa mais colunas
@@ -413,14 +417,14 @@ def build(fmt, W, H, m, orient):
     na = QgsLayoutItemPicture(L)
     na.setId('Indicação do Norte')
     L.addLayoutItem(na)
-    na.setPicturePath(LOGO_NORTE, Qgis.PictureFormat.Raster)
-    na.setResizeMode(QgsLayoutItemPicture.Zoom)
+    definir_figura(na, LOGO_NORTE)
+    na.setResizeMode(E(QgsLayoutItemPicture, "ResizeMode", "Zoom"))
     na.setLinkedMap(mp)
     place(na, cx + pad, cy + (ch - nw) / 2, nw * 0.69, nw)
     sx = cx + pad * 2 + nw * 0.8
     sw = cx + cw - sx - pad
     label(L, f"ESCALA 1:[% format_number(map_get({MV}, 'map_scale'), 0) %]",
-          sx, cy + pad, sw, ch * 0.30, 7.5 * k, True, Qt.AlignHCenter, Qt.AlignVCenter, 'Escala numérica')
+          sx, cy + pad, sw, ch * 0.30, 7.5 * k, True, Qt.AlignmentFlag.AlignHCenter, Qt.AlignmentFlag.AlignVCenter, 'Escala numérica')
     sb = QgsLayoutItemScaleBar(L)
     sb.setId('Escala gráfica')
     L.addLayoutItem(sb)
@@ -430,12 +434,12 @@ def build(fmt, W, H, m, orient):
     seg_m = nice_down((sw * 0.80 / 3) / 1000.0 * mp.scale())   # metros reais por segmento
     seg_m = max(seg_m, 1)
     km = seg_m >= 1000
-    sb.setUnits(QgsUnitTypes.DistanceKilometers if km else QgsUnitTypes.DistanceMeters)
+    sb.setUnits(E(Qgis, "DistanceUnit", "Kilometers", (QgsUnitTypes, "DistanceKilometers")) if km else E(Qgis, "DistanceUnit", "Meters", (QgsUnitTypes, "DistanceMeters")))
     sb.setUnitLabel('km' if km else 'm')
     sb.setNumberOfSegments(2)
     sb.setNumberOfSegmentsLeft(1)
     sb.setNumberOfSubdivisions(2)
-    sb.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeFixed)
+    sb.setSegmentSizeMode(E(QgsScaleBarSettings, "SegmentSizeMode", "Fixed", (QgsScaleBarSettings, "SegmentSizeFixed")))
     sb.setUnitsPerSegment(seg_m / 1000.0 if km else seg_m)
     sb.setNumericFormat(QgsBasicNumericFormat())
     sb.setHeight(1.8 * k)
@@ -459,7 +463,7 @@ def build(fmt, W, H, m, orient):
             "|| ''' ' || lpad(round((@m - floor(@m)) * 60), 2, '0') || '\"')))")
     th = 3.2 * k
     label(L, 'SISTEMA DE REFERÊNCIA', cx + pad, cy + pad, cw - 2 * pad, th, 5.5 * k, True,
-          Qt.AlignLeft, Qt.AlignVCenter, 'Título sistema de referência')
+          Qt.AlignmentFlag.AlignLeft, Qt.AlignmentFlag.AlignVCenter, 'Título sistema de referência')
     label(L, 'Projeção Universal Transversa de Mercator – UTM\n'
              'Datum horizontal: SIRGAS 2000 – Fuso 21 Sul\n'
              'Meridiano Central: 57° W Gr.  |  ' + f"[% map_get({MV}, 'map_crs') %]\n"
@@ -467,7 +471,7 @@ def build(fmt, W, H, m, orient):
              'Convergência meridiana (centro): [% ' + conv + ' %]\n'
              "Declinação magnética ([% format_date(now(), 'MM/yyyy') %]): [% " + DECL + " %]"
              " – cresce 0°09' W/ano (WMM-2025)",
-          cx + pad, cy + pad + th, cw - 2 * pad, ch - 2 * pad - th, 5.5 * k, False, Qt.AlignLeft, Qt.AlignTop,
+          cx + pad, cy + pad + th, cw - 2 * pad, ch - 2 * pad - th, 5.5 * k, False, Qt.AlignmentFlag.AlignLeft, Qt.AlignmentFlag.AlignTop,
           'Informações cartográficas')
 
     # ---------------- Fonte / créditos / folha (carimbo) ----------------
@@ -480,7 +484,7 @@ def build(fmt, W, H, m, orient):
     pic(L, LOGO_SEPLAN, cx + cw - pad - lw, cy + (ra - lhh) / 2, lw, lhh, 'Marca SEPLAN / Prefeitura')
     label(L, '<b>FONTE:</b> Prefeitura de Dourados – SEPLAN (cadastro e aerolevantamento 2018); '
              'IBGE (limites). <b>CONTATO:</b> [% @contato %]',
-          cx + pad, cy + pad, cw - lw - 3 * pad, ra - 2 * pad, 5.2 * k, False, Qt.AlignLeft, Qt.AlignVCenter,
+          cx + pad, cy + pad, cw - lw - 3 * pad, ra - 2 * pad, 5.2 * k, False, Qt.AlignmentFlag.AlignLeft, Qt.AlignmentFlag.AlignVCenter,
           'Fonte dos dados', rich=True)
     # campos do carimbo
     campos = [('RESPONSÁVEL TÉCNICO', '[% @rt_nome %] – [% @rt_titulo %]\n[% @rt_registro %]\n[% @rt_art %]', .56),
@@ -492,10 +496,10 @@ def build(fmt, W, H, m, orient):
         fw = cw * frac
         rect(L, fx, cy + ra, fw, rb, sw=0.25, iid=f'Campo {cap.lower()}')
         label(L, cap, fx + pad * 0.7, cy + ra + pad * 0.5, fw - 1.4 * pad, rb * 0.36, 3.8 * k, False,
-              Qt.AlignLeft, Qt.AlignTop, f'Rótulo {cap.lower()}')
+              Qt.AlignmentFlag.AlignLeft, Qt.AlignmentFlag.AlignTop, f'Rótulo {cap.lower()}')
         multi = '\n' in val
         label(L, val, fx + pad * 0.7, cy + ra + rb * 0.30, fw - 1.4 * pad, rb * 0.70 - pad * 0.4,
-              (4.3 if multi else 5.5) * k, not multi, Qt.AlignHCenter, Qt.AlignVCenter, f'Valor {cap.lower()}')
+              (4.3 if multi else 5.5) * k, not multi, Qt.AlignmentFlag.AlignHCenter, Qt.AlignmentFlag.AlignVCenter, f'Valor {cap.lower()}')
         fx += fw
 
     L.refresh()

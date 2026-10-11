@@ -54,7 +54,7 @@ def camada_no_projeto(project, servico):
     """Camada já existente no projeto com a mesma fonte (ou mesmo nome), ou None."""
     alvo = _norm(servico["fonte"])
     for layer in project.mapLayers().values():
-        if layer.type() == layer.RasterLayer and (
+        if isinstance(layer, QgsRasterLayer) and (
                 _norm(layer.source()) == alvo or layer.name() == servico["nome"]):
             return layer
     return None

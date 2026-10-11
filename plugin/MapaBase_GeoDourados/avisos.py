@@ -85,7 +85,7 @@ def mostrar_aviso_dados(parent=None):
     btn.setFixedHeight(28)
     btn.clicked.connect(dlg.accept)
     lay.addWidget(btn)
-    dlg.exec_()
+    dlg.exec()
     QSettings().setValue(CHAVE_VISTO, True)
 
 

@@ -10,10 +10,10 @@ class FerramentaClique(QgsMapToolEmitPoint):
     def __init__(self, canvas, ao_clicar):
         super().__init__(canvas)
         self._ao_clicar = ao_clicar
-        self.setCursor(Qt.CrossCursor)
+        self.setCursor(Qt.CursorShape.CrossCursor)
 
     def canvasReleaseEvent(self, evento):
-        if evento.button() == Qt.RightButton:
+        if evento.button() == Qt.MouseButton.RightButton:
             self._ao_clicar(None)
-        elif evento.button() == Qt.LeftButton:
+        elif evento.button() == Qt.MouseButton.LeftButton:
             self._ao_clicar(self.toMapCoordinates(evento.pos()))

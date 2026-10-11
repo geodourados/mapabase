@@ -11,6 +11,7 @@ from qgis.core import (
 )
 
 from .camadas import camadas_principais
+from .compat import E
 
 TIPOS = [
     ("Inscrição", "inscricao"),
@@ -88,7 +89,7 @@ def _buscar_por_nome(layer, campos_nome, termo, exata, rotulo_extra=None):
         return [], "A camada não tem campo de nome."
     alvo = _norm(termo)
     palavras = alvo.split()
-    req = QgsFeatureRequest().setFlags(QgsFeatureRequest.NoGeometry).setSubsetOfAttributes(campos, layer.fields())
+    req = QgsFeatureRequest().setFlags(E(QgsFeatureRequest, "Flag", "NoGeometry")).setSubsetOfAttributes(campos, layer.fields())
     grupos = {}
     for f in layer.getFeatures(req):
         textos = [_norm(_valor(f, c)) for c in campos]

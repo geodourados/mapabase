@@ -83,7 +83,7 @@ def versoes(fonte, project):
         return [((hoje - datetime.timedelta(days=n)).isoformat(),) * 2 for n in range(3, 401)]
     if fonte == "projeto":
         return [(l.name(), l.id()) for l in project.mapLayers().values()
-                if l.type() == QgsMapLayer.RasterLayer and l.customProperty(PROP) is None
+                if isinstance(l, QgsRasterLayer) and l.customProperty(PROP) is None
                 and l.customProperty(mapbiomas.PROP) is None]
     return []
 
@@ -208,7 +208,7 @@ class SwipeItem(QgsMapCanvasItem):
         painter.setBrush(QBrush(QColor(255, 255, 255)))
         painter.setPen(QPen(QColor(0, 0, 0), 1))
         painter.drawEllipse(meio, 9, 9)
-        painter.drawText(QRectF(meio.x() - 9, meio.y() - 9, 18, 18), Qt.AlignCenter, "⇔" if self.vertical else "⇕")
+        painter.drawText(QRectF(meio.x() - 9, meio.y() - 9, 18, 18), Qt.AlignmentFlag.AlignCenter, "⇔" if self.vertical else "⇕")
 
 
 class ArrastoLinha(QObject):
@@ -235,7 +235,7 @@ class ArrastoLinha(QObject):
 
     def _cursor(self, sim):
         if sim and not self.cursor_trocado:
-            QApplication.setOverrideCursor(Qt.SplitHCursor if self.item.vertical else Qt.SplitVCursor)
+            QApplication.setOverrideCursor(Qt.CursorShape.SplitHCursor if self.item.vertical else Qt.CursorShape.SplitVCursor)
             self.cursor_trocado = True
         elif not sim and self.cursor_trocado:
             QApplication.restoreOverrideCursor()
@@ -249,18 +249,18 @@ class ArrastoLinha(QObject):
 
     def eventFilter(self, _obj, e):
         tipo = e.type()
-        if tipo == QEvent.MouseButtonPress and e.button() == Qt.LeftButton and self._perto(e.pos()):
+        if tipo == QEvent.Type.MouseButtonPress and e.button() == Qt.MouseButton.LeftButton and self._perto(e.pos()):
             self.arrastando = True
             return True
-        if tipo == QEvent.MouseMove:
+        if tipo == QEvent.Type.MouseMove:
             if self.arrastando:
                 self._mover(e.pos())
                 return True
             self._cursor(self._perto(e.pos()))
-        if tipo == QEvent.MouseButtonRelease and self.arrastando:
+        if tipo == QEvent.Type.MouseButtonRelease and self.arrastando:
             self.arrastando = False
             return True
-        if tipo == QEvent.Leave and not self.arrastando:
+        if tipo == QEvent.Type.Leave and not self.arrastando:
             self._cursor(False)
         return False
 
@@ -327,8 +327,8 @@ class ComparadorDialog(QDialog):
         self.canvas = iface.mapCanvas()
         self.projeto = QgsProject.instance()
         self.setWindowTitle("Comparar imagens (cortina)")
-        self.setWindowFlag(Qt.Tool, True)
-        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setWindowFlag(Qt.WindowType.Tool, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.cam_esq = self.cam_dir = None
         self.dir_do_projeto = self.esq_do_projeto = False
         self.item = SwipeItem(self.canvas)
@@ -341,7 +341,7 @@ class ComparadorDialog(QDialog):
             self.lado_esq.cb_versao.setCurrentIndex(min(40, self.lado_esq.cb_versao.count() - 1))
         v.addLayout(self.lado_esq)
         v.addLayout(self.lado_dir)
-        self.sl = QSlider(Qt.Horizontal)
+        self.sl = QSlider(Qt.Orientation.Horizontal)
         self.sl.setRange(0, 100)
         self.sl.setValue(50)
         self.sl.valueChanged.connect(self._slider)
@@ -374,7 +374,7 @@ class ComparadorDialog(QDialog):
             # acima dos mapas de fundo (primeira camada raster), abaixo dos vetores
             pos = len(raiz.children())
             for i, no in enumerate(raiz.children()):
-                if not no.nodeType() == 0 and no.layer() is not None and no.layer().type() == QgsMapLayer.RasterLayer:
+                if not no.nodeType() == 0 and no.layer() is not None and isinstance(no.layer(), QgsRasterLayer):
                     pos = i
                     break
             g = raiz.insertGroup(pos, GRUPO)

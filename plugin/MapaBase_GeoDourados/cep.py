@@ -4,7 +4,7 @@ import json
 import re
 import urllib.request
 
-from qgis.core import QgsFeatureRequest
+from qgis.core import QgsFeatureRequest, QgsGeometry
 
 from .camadas import camadas_principais
 
@@ -90,7 +90,7 @@ def _para_crs(geom_ou_pt, crs_origem, crs_destino, project):
 def eixo_no_ponto(project, ponto_geom, crs_ponto, tolerancia):
     """Eixo viário mais próximo do ponto clicado (QgsGeometry de ponto em crs_ponto),
     dentro da tolerância (unidades do crs_ponto). Retorna dict ou None."""
-    from qgis.core import QgsFeatureRequest
+    from qgis.core import QgsFeatureRequest, QgsGeometry
     layer = camadas_principais(project)["logradouros"]
     if layer is None:
         return None
@@ -118,8 +118,7 @@ def _testada(lote, rua_geom, dist, folga):
     """Metros da divisa do lote que correm ao longo da rua (testada): trecho do contorno do lote
     dentro de uma faixa em volta do eixo, com raio = distância do lote ao eixo + folga."""
     contorno = QgsGeometry_copia(lote)
-    from qgis.core import QgsWkbTypes
-    contorno = contorno.convertToType(QgsWkbTypes.LineGeometry, False) or contorno      # polígono -> linha (divisa)
+    contorno = QgsGeometry(contorno.constGet().boundary())      # polígono -> linha (divisa)
     faixa = rua_geom.buffer(dist + folga, 8)
     return contorno.intersection(faixa).length()
 
@@ -128,7 +127,7 @@ def eixos_da_frente(project, geom_lote, crs_lote, folga=6.0):
     """Eixos viários que fazem frente ao lote, ordenados pela MENOR TESTADA (trecho de divisa do lote
     voltado para a rua). Lote de esquina tem duas frentes: a de menor testada vem primeiro.
     Lista de dicts com nome, cep8, distancia, testada, geom, crs."""
-    from qgis.core import QgsFeatureRequest
+    from qgis.core import QgsFeatureRequest, QgsGeometry
     layer = camadas_principais(project)["logradouros"]
     if layer is None:
         return []
