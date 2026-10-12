@@ -482,7 +482,7 @@ def build(fmt, W, H, m, orient):
     lw = min(cw * 0.34, (ra - 2 * pad) * 1390 / 245)
     lhh = lw * 245 / 1390
     pic(L, LOGO_SEPLAN, cx + cw - pad - lw, cy + (ra - lhh) / 2, lw, lhh, 'Marca SEPLAN / Prefeitura')
-    label(L, '<b>FONTE:</b> Prefeitura de Dourados – SEPLAN (cadastro e aerolevantamento 2018); '
+    label(L, '<b>FONTE:</b> Prefeitura de Dourados – SEPLAN, CC BY 4.0 (cadastro e aerolevantamento 2018); '
              'IBGE (limites). <b>CONTATO:</b> [% @contato %]',
           cx + pad, cy + pad, cw - lw - 3 * pad, ra - 2 * pad, 5.2 * k, False, Qt.AlignmentFlag.AlignLeft, Qt.AlignmentFlag.AlignVCenter,
           'Fonte dos dados', rich=True)

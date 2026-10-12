@@ -5,9 +5,9 @@ from qgis.PyQt.QtWidgets import QDialog, QPushButton, QTextBrowser, QVBoxLayout
 CHAVE_VISTO = "MapaBaseGeoDourados/aviso_dados_visto_v1"
 
 AVISO_CURTO = (
-    "Dados públicos (Lei nº 4.390/2019 e Lei de Acesso à Informação). Base em "
-    "atualização constante: pode conter erros ou imprecisões. Não substitui "
-    "documentos oficiais."
+    "Dados públicos (Lei nº 4.390/2019 e Lei de Acesso à Informação), licença CC BY 4.0: "
+    "cite a fonte. Base em atualização constante: pode conter erros ou imprecisões. "
+    "Não substitui documentos oficiais."
 )
 
 AVISO_HTML = """
@@ -29,6 +29,26 @@ AVISO_HTML = """
   (Lei nº 12.527/2011).<br>
   Lei municipal: <a href="http://leis.org/qzfuw">http://leis.org/qzfuw</a>.
   Consulte-a para as condições de utilização dos dados por terceiros.
+</div>
+
+<h4>Licença e atribuição — CC BY 4.0</h4>
+<div class="box">
+  Os dados da base cartográfica da Prefeitura estão licenciados sob
+  <b>Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)</b>. Você pode
+  <b>copiar, redistribuir, adaptar e usar para qualquer fim, inclusive comercial</b>,
+  <b>desde que cite a fonte</b>, indique se fez mudanças e não sugira que o Município
+  endossa o seu uso.<br><br>
+  <b>Como citar:</b><br>
+  <i>"Base Cartográfica do Município de Dourados/MS — Prefeitura Municipal de Dourados,
+  instituída pela Lei Ordinária nº 4.390/2019, Art. 9º (caráter ostensivo). Dados
+  disponibilizados sob licença CC BY 4.0. Fonte: https://github.com/geodourados/mapabase/"</i><br><br>
+  Texto completo: <a href="https://creativecommons.org/licenses/by/4.0/legalcode.pt">creativecommons.org/licenses/by/4.0/legalcode.pt</a>
+  &middot; <a href="https://github.com/geodourados/mapabase/blob/main/LICENSE.md">LICENSE.md</a><br><br>
+  <b>Observações:</b> dados pessoais, se houver, seguem a LGPD (Lei nº 13.709/2018); o uso está sujeito às
+  normas da Secretaria de Planejamento (Art. 9º) e o Art. 10 da lei admite ressarcimento de despesas de
+  reprodução; o Município participa da INDE (Decreto nº 6.666/2008).<br>
+  <b>Dados de terceiros</b> (aba Complemento: IBGE, SICAR, INCRA, FUNAI, IBAMA, Receita Federal,
+  OpenStreetMap, MapBiomas e imagens de satélite) mantêm as licenças e atribuições das fontes originais.
 </div>
 
 <div class="warn">
