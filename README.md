@@ -100,3 +100,19 @@ Dados públicos, também observada a Lei de Acesso à Informação (Lei nº 12.5
 > matrícula, certidões, levantamento topográfico/georreferenciado nem projetos
 > aprovados, e não deve ser usada como prova de propriedade, posse ou limites.
 > Confirme junto à Prefeitura antes de decisões que dependam de precisão.
+
+## 📜 Licença e Uso
+
+Os dados deste repositório são **dados públicos de caráter ostensivo**, instituídos pela **Lei Ordinária nº 4.390, de 17 de dezembro de 2019** (Art. 9º), e estão licenciados sob **Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)**.
+
+É permitido o download, uso, adaptação e redistribuição dos dados, inclusive para fins comerciais, **mediante atribuição da fonte**:
+
+> "Base Cartográfica do Município de Dourados/MS — Prefeitura Municipal de Dourados (Lei 4.390/2019, CC BY 4.0). Fonte: https://github.com/geodourados/mapabase/"
+
+Consulte o arquivo [LICENSE.md](LICENSE.md) para detalhes completos.
+
+> **Dados de terceiros.** A licença acima vale para os dados da base cartográfica da Prefeitura. O pacote opcional
+> "Complemento IBGE e Rural" (Release `complemento`) reúne dados de outras fontes — IBGE, SICAR/Serviço Florestal
+> Brasileiro, INCRA, FUNAI, IBAMA, Receita Federal e OpenStreetMap (ODbL) —, que mantêm as licenças e as atribuições
+> de origem, listadas na aba Complemento do plugin e na tabela `pacote_camadas` do GeoPackage.
+
