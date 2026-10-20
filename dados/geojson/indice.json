@@ -1,5 +1,5 @@
 {
- "atualizado": "2026-10-19T07:28:31-04:00",
+ "atualizado": "2026-10-20T06:01:14-04:00",
  "lotes": {
   "00.01-1": {
    "arquivo": "lotes/00.01-1.geojson",
@@ -9,7 +9,7 @@
     -54.808199,
     -22.20511
    ],
-   "total": 10292,
+   "total": 10295,
    "faixa": [
     "00.01.01",
     "00.01.28"
@@ -65,7 +65,7 @@
     -54.805244,
     -22.222374
    ],
-   "total": 14844,
+   "total": 14874,
    "faixa": [
     "00.04.00",
     "00.04.52"
@@ -746,7 +746,7 @@
     -54.48053,
     -22.073956
    ],
-   "total": 7970
+   "total": 7973
   },
   "loteamentos.geojson": {
    "arquivo": "loteamentos.geojson",
@@ -756,7 +756,7 @@
     -54.48053,
     -22.073956
    ],
-   "total": 443
+   "total": 444
   },
   "zoneamento.geojson": {
    "arquivo": "zoneamento.geojson",
