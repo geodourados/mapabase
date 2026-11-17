@@ -1,5 +1,5 @@
 {
- "atualizado": "2026-11-16T07:29:25-04:00",
+ "atualizado": "2026-11-17T06:01:17-04:00",
  "lotes": {
   "00.01-1": {
    "arquivo": "lotes/00.01-1.geojson",
@@ -736,7 +736,7 @@
     -54.229596,
     -21.890613
    ],
-   "total": 7526
+   "total": 7539
   },
   "quadras.geojson": {
    "arquivo": "quadras.geojson",
